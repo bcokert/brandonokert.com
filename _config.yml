@@ -70,5 +70,5 @@ theme: custom
 deploy:
   type: git
   repo: git@github.com:bcokert/bcokert.github.io.git
-  branch: test-deploy
+  branch: master
   message: "Auto Deployment from Hexo"
