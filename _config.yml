@@ -7,7 +7,7 @@ title: BrandonOkert.com
 subtitle:
 description: My place to talk about code, coffee, books, like, and whatever comes to mind
 author: Brandon Okert
-language: English
+language: default
 timezone: America/Vancouver
 
 # URL
@@ -63,7 +63,7 @@ pagination_dir: page
 # Extensions
 ## Plugins: http://hexo.io/plugins/
 ## Themes: http://hexo.io/themes/
-theme: landscape
+theme: custom
 
 # Deployment
 ## Docs: http://hexo.io/docs/deployment.html
@@ -71,4 +71,4 @@ deploy:
   type: git
   repo: git@github.com:bcokert/bcokert.github.io.git
   branch: test-deploy
-  message: "Auto Deployment from Hexo {{}}"
+  message: "Auto Deployment from Hexo"
