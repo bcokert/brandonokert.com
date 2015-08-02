@@ -1,8 +1,5 @@
-<div class="alignleft">
-  <% if (config.author){ %>
-  &copy; <%= new Date().getFullYear() %> <%= config.author %>
-  <% } else { %>
-  &copy; <%= new Date().getFullYear() %> <%= config.title %>
-  <% } %>
-</div>
-<div class="clearfix"></div>
+<footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; <%= date(new Date(), 'YYYY') + ' ' + config.author || config.title %>. All Rights Reserved.
+    </span>
+</footer>

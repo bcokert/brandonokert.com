@@ -5,6 +5,7 @@ tags:
   - introduction
 author: Brandon Okert
 summary: My first post!
+thumbnailImage: about-me-profile.jpg
 ---
 
 What's the meaning of life? Where do babies come from? How to I make the perfect app?

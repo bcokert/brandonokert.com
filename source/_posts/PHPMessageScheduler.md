@@ -6,6 +6,7 @@ tags:
   - project
   - message-scheduler
 author: Brandon Okert
+thumbnailImage: MainInterface.png
 summary: How I made a simple message scheduler on the weekend
 ---
 

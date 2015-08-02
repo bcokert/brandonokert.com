@@ -1,4 +1,6 @@
-.inline {
+#about-card-bio img {
   display: inline;
-  margin-right: 8px;
+  margin-right: 4px;
+  width:64px;
+  height:64px;
 }
