@@ -42,10 +42,10 @@ sidebar:
              title: Twitter
              url: https://twitter.com/BrandonOkert
              icon: twitter
-         facebook:
-             title: Facebook
-             url: https://www.facebook.com/brandon.okert
-             icon: facebook
+#         facebook:
+#             title: Facebook
+#             url: https://www.facebook.com/
+#             icon: facebook
 #         google_plus:
 #             title: Google +
 #             url: https://plus.google.com/
