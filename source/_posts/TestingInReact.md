@@ -10,7 +10,7 @@ tags:
   - mocking
   - rewire
 author: Brandon Okert
-date: 2015-08-02 14:06:58
+date: 2015-08-04 16:00:00
 thumbnailImage: thumbnail.png
 summary: An Overview of Common Test Scenarios and Gotchas in ReactJs
 ---
@@ -21,6 +21,8 @@ Through building up our own coverage, I've collected several such scenarios and 
  
 <!-- toc -->
 
+
+
 # Scenarios
 The code examples are all written in the React Transpilers subset of ES6, and in Jasmine/Karma style. However, any toolset that allows manual control of test completion (for asynchronous testing) should be fine. 
 
@@ -28,6 +30,7 @@ In addition, many scenarios make use of Test Utilities. These will be referred t
 
 ## Verify Component Renders with the Correct DOM
 Utility Patterns: None
+
 ```javascript my-component.jsx
 class MyComponent extends React.Component {
   render () {
@@ -73,34 +76,185 @@ describe('MyComponent', () => {
 ```
 
 ## Verify Component Renders its Child Components
-Utility Patterns: None
+Utility Patterns: WithMocks
+
+```javascript my-component-spec.jsx
+  it('should be rendered with an Avatar as a child', () => {
+    profile = TestUtils.renderIntoDocument(<Profile />);
+    var child = ReactTestUtils.findRenderedComponentWithType(Profile, Avatar);
+    expect(ReactTestUtils.isCompositeComponentWithType(child, Avatar)).toBe(true);
+  });
+```
+
+If you have mocked the child components, then you need to search for the mocked classes:
+```javascript my-component-mocked-spec.jsx
+
+  class MockAvatar extends React.Component {
+    render () {...}
+  }
+
+  it('should be rendered with an Avatar as a child', () => {
+    withMocks(Profile, {
+      Avatar: MockAvatar
+    }, () => {
+      profile = TestUtils.renderIntoDocument(<Profile />);
+      var child = ReactTestUtils.findRenderedComponentWithType(Profile, MockAvatar);
+      expect(ReactTestUtils.isCompositeComponentWithType(child, Avatar)).toBe(true);
+    });
+  });
+```
 
 ## Verify Component has X Children
 Utility Patterns: None
 
+```javascript my-component-spec.jsx
+  it('should be rendered with several child Profiles', () => {
+    profileList = TestUtils.renderIntoDocument(<ProfileList />);
+    var children = ReactTestUtils.scryRenderedComponentsWithType(profileList, Profile);
+    expect(children.length).toBe(5);
+  });
+```
+
 ## Verify Component Passes the Correct Props to its Child
 Utility Patterns: None
 
+Props are persistent for the current 'render' of a component, and thus can be easily referred to at any point in a components lifetime.
+
+```javascript my-component-spec.jsx
+  it('should pass the correct value into its child Avatar', () => {
+    profile = TestUtils.renderIntoDocument(<Profile />);
+    var avatar = ReactTestUtils.findRenderedComponentWithType(profile, Avatar);
+    expect(avatar.props.url).toBe(profile.state.mainAvatarUrl);
+  });
+```
+
 ## Verify Components Callback is Called with the Correct Params
-Utility Patterns: None
+Utility Patterns: WaitFor
+
+```javascript my-component-spec.jsx
+  it('should call the onClose callback and pass in the accountLists id when close is clicked', (done) => {
+    var wasCallbackCalledCorrectly = false;
+    accountList = TestUtils.renderIntoDocument(<AccountList id={42} onClose={(id) => {
+      wasCallbackCalledCorrectly = id === 42;
+    }} />);
+    
+    TestUtils.Simulate.click(React.findDOMNode(accountList.refs.closeButton));
+    waitFor(() => wasCallbackCalledCorrectly, 'The onClose callback was not called when close was clicked', done);
+  });
+```
 
 ## Verify Components Callback is Not Called
-Utility Patterns: None
+Utility Patterns: Then
 
-## Verify Components Child Calls its Passed Callback
-Utility Patterns: None
+```javascript my-component-spec.jsx
+  it('should not call the onClose callback when close is clicked but there is a warning', (done) => {
+    accountList = TestUtils.renderIntoDocument(<AccountList
+      initialWarning='No profiles found. Please add at least one profile'
+      onClose={() => {
+        fail('The close callback was called while the account list contains a warning');
+        done(); // ensure we don't waste time waiting for the test to time out
+      }}
+    />);
+    
+    TestUtils.Simulate.click(React.findDOMNode(accountList.refs.closeButton));
+    then(() => done(), 100); // give the component 100ms to fail, then assume it hasn't called it
+  });
+```
 
 ## Verify Components Callback is Called within a Specific Time-Window
-Utility Patterns: None
+Utility Patterns: WaitFor, Then
+
+```javascript my-component-spec.jsx
+  // Perhaps you want there to be a visual lag, so a process should take between x and y seconds #contrivedExample
+  it('should call the onDataReceived callback between 1 and 2 seconds of clicking the refresh button', (done) => {
+    var wasCallbackCalled = false;
+    accountList = TestUtils.renderIntoDocument(<AccountList onDataReceived={() => {
+      wasCallbackCalled = true;
+    }} />);
+    
+    TestUtils.Simulate.click(React.findDOMNode(accountList.refs.refreshButton));
+    then(() => {
+      expect(wasCallbackCalled).toBe(false);
+    }, 975).then(() => {
+      waitFor(() => wasCallbackCalled, 'The onDataReceived callback was not called soon enough', done, 1025);
+    });
+  });
+```
 
 ## Verify Components State is Correct after a Click
-Utility Patterns: None
+Utility Patterns: Then, WaitFor
+
+```javascript my-component-spec.jsx
+  it('should store the selected Account when one is clicked', (done) => {
+    var accounts = [1,2,3].map(() => createTestAccountData());
+    var accountList = TestUtils.renderIntoDocument(<AccountList accounts={accounts} />);
+    
+    // unlike re-rendering after a setState, renderIntoDocument will block until the component is rendered, so we can use it right away
+    var accountToClick = TestUtils.scryRenderedComponentsWithType(accountList, Account)[1];
+    TestUtils.Simulate.click(React.findDOMNode());
+    
+    then(() => {
+      expect(accountList.state.selectedAccounts).toEqual([accounts[1]);
+    });
+    
+    //OR
+    
+    waitFor(
+      () => accountList.state.selectedAccounts.length === 1 && accountList.state.selectedAccounts[0] === accounts[1],
+      'The Account was not selected after clicking it',
+      done
+    );
+  });
+```
 
 ## Verify Components State is Correct after Typing
-Utility Patterns: None
+Utility Patterns: WaitFor
+```javascript my-component-spec.jsx
+  it('should change the search query state after the user types in a name', (done) => {
+    var accountList = TestUtils.renderIntoDocument(<AccountList accounts={accounts} />);
+    var searchBoxNode = React.findDOMNode(accountList.refs.searchBoxInput);
+    
+    searchBoxNode.value = 'Smitty Johnson';
+    ReactTestUtils.Simulate.change(searchBoxNode);
+    
+    waitFor(
+      () => accountlist.state.searchString === 'Smitty Johnson',
+      'The search query was not updated after entering in a search string',
+      done
+    );
+  });
+```
 
 ## Verify Components State is Correct after a Sequence of Events
-Utility Patterns: None
+Utility Patterns: Then
+
+```javascript my-component-spec.jsx
+  it('should de-select any accounts when I select an account group', (done) => {
+    accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
+  
+    var accounts;
+    
+    accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+    TestUtils.Simulate.click(accounts[1]);
+    then(() => {
+      accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+      TestUtils.Simulate.click(accounts[2]);
+    }).then(() => {
+      accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+      TestUtils.Simulate.click(accounts[4]);
+    }).then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(3);
+  
+      var accountGroup = TestUtils.findRenderedComponentWithType(accountSelector, AccountGroup);
+      TestUtils.Simulate.click(accountGroup);
+    }).then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(0);
+      done();
+    });
+  });
+```
+
+
 
 # Utility Patterns
 These patterns can make your life a lot easier, and make your tests cleaner to boot. Apply liberally.
@@ -126,12 +280,12 @@ it('should ...', (done) => {
   then(() => {
     TestUtils.Simulate.click(React.findDOMNode(component));
   }).then(() => {
-    TestUtils.Simulate.click(React.findDOMNode(component));
-  }).then(() => {
     // we gave this one an extra 100 ms
+    TestUtils.Simulate.click(React.findDOMNode(component));
+  }, 100).then(() => {
     expect(...);
     done();
-  }, 100);
+  });
 });
 ```
 ## WaitFor
@@ -186,7 +340,7 @@ it('should wait for a long process', (done) => {
 }, 10500);
 ```
 
-## withMocksBeforeEach
+## WithMocksBeforeEach
 This is a useful pattern to use along with a rewired component and some mocks. Simply specify that for all of the following tests, the dependencies of the component are to be replaced by the given mocks. Great for mocking things like ajaxServices.
 Kreds to [Alex Boissiére](https://twitter.com/theasta) for the original implementation.
 
@@ -219,12 +373,13 @@ module.exports = withMocksBeforeEach;
 
 ```javascript with-mocks-before-each-spec.jsx
 var withMocksBeforeEach = require('lib/withMocksBeforeEach');
+var rewire = require('rewire');
+
+var LatestArticleButton = rewire('src/components/latest-article-button');
 
 describe('The get latest article button', () => {
   var mockAjaxRequest = (url, callback) => callback({success: true, content: ""});
   var mockDatabase = {select: (table, command) => [], createTable: () => null};
-  
-  var LatestArticleButton = rewire('src/components/latest-article-button');
   
   withMocksBeforeEach(LatestArticleButton, {
     ajaxRequest: mockAjaxRequest,
@@ -239,7 +394,7 @@ describe('The get latest article button', () => {
 });
 ```
 
-## withMocks
+## WithMocks
 This is similar to the withMocksBeforeEach pattern, but can be applied to individual tests. Good for when some mocks are shared, and some are particular to only a single test.
 
 ```javascript with-mocks.js
@@ -270,12 +425,13 @@ module.exports = withMocks;
 
 ```javascript with-mocks-spec.jsx
 var withMocks = require('lib/withMocks');
+var rewire = require('rewire');
+
+var LatestArticleButton = rewire('src/components/latest-article-button');
 
 describe('The get latest article button', () => {
   var mockAjaxRequest = (url, callback) => callback({success: true, content: ""});
   var mockDatabase = {select: (table, command) => [], createTable: () => null};
-  
-  var LatestArticleButton = rewire('src/components/latest-article-button');
   
   it('should render a sorry message if an article is returned successfully but is empty', () => {
     withMocks(LatestArticleButton, {
@@ -289,6 +445,8 @@ describe('The get latest article button', () => {
   });
 });
 ```
+
+
 
 # Gotchas
 
@@ -328,20 +486,20 @@ The operation of these simulations all depend on the state and DOM generated by 
 
 The solution to both of these problems is to use the Then pattern, or the WaitFor pattern, along with manual termination of tests:
 ```javascript gotcha-covered-spec.js
-it('should add the clicked account to the list of selected accounts', (done) => {
-  accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
-  
-  var accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
-  TestUtils.Simulate.click(accounts[1]);
-  then(() => {
-    expect(accountSelector.state.selectedAccounts.length).toBe(1);
-    done();
+  it('should add the clicked account to the list of selected accounts', (done) => {
+    accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
+    
+    var accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+    TestUtils.Simulate.click(accounts[1]);
+    then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(1);
+      done();
+    });
+    
+    //OR
+    
+    waitFor(() => accountSelector.state.selectedAccounts.length === 1, 'The selectedAccounts list was not updated after clicking an account', done);
   });
-  
-  //OR
-  
-  waitFor(() => accountSelector.state.selectedAccounts.length === 1, 'The selectedAccounts list was not updated after clicking an account', done);
-});
 ```
 
 See the next Gotcha for an example of proper sequencing for Simulations.
@@ -349,25 +507,25 @@ See the next Gotcha for an example of proper sequencing for Simulations.
 ## You Cannot Simulate Events in Series Without Re-Finding DOM Components
 Consider the following test, where we already know we have to sequence our simulations:
 ```javascript gotcha-spec.js
-it('should de-select any accounts when I select an account group', (done) => {
-  accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
-
-  var accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
-  var accountGroup = TestUtils.findRenderedComponentWithType(accountSelector, AccountGroup);
+  it('should de-select any accounts when I select an account group', (done) => {
+    accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
   
-  TestUtils.Simulate.click(accounts[1]);
-  then(() => {
-    TestUtils.Simulate.click(accounts[2]);
-  }).then(() => {
-    TestUtils.Simulate.click(accounts[4]);
-  }).then(() => {
-    expect(accountSelector.state.selectedAccounts.length).toBe(3);
-    TestUtils.Simulate.click(accountGroup);
-  }).then(() => {
-    expect(accountSelector.state.selectedAccounts.length).toBe(0);
-    done();
+    var accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+    var accountGroup = TestUtils.findRenderedComponentWithType(accountSelector, AccountGroup);
+    
+    TestUtils.Simulate.click(accounts[1]);
+    then(() => {
+      TestUtils.Simulate.click(accounts[2]);
+    }).then(() => {
+      TestUtils.Simulate.click(accounts[4]);
+    }).then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(3);
+      TestUtils.Simulate.click(accountGroup);
+    }).then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(0);
+      done();
+    });
   });
-});
 ```
 
 If you run this, you'll right away notice what's wrong: it'll fail with a cryptic error:
@@ -378,33 +536,95 @@ Error: Invariant Violation: Component (with keys: getDOMNode,props,context,state
 This is occurring because you are Simulating an event on a DOM element that is no longer rendered. Via closure, the reference in accounts[2] is still a valid pointer, but it is no longer in the DOM, because clicking on the first button has changed the state, which in turned casues a re-render, replacing the old DOM nodes. After the re-render, we need to re-grab the DOM node that we want to click. 
 
 ```javascript gotcha-covered-spec.js
-it('should de-select any accounts when I select an account group', (done) => {
-  accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
-
-  var accounts;
+  it('should de-select any accounts when I select an account group', (done) => {
+    accountSelector = TestUtils.renderIntoDocument(<AccountSelector accounts={[...]} accountGroups={[...]} />);
   
-  accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
-  TestUtils.Simulate.click(accounts[1]);
-  then(() => {
+    var accounts;
+    
     accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
-    TestUtils.Simulate.click(accounts[2]);
-  }).then(() => {
-    accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
-    TestUtils.Simulate.click(accounts[4]);
-  }).then(() => {
-    expect(accountSelector.state.selectedAccounts.length).toBe(3);
-
-    var accountGroup = TestUtils.findRenderedComponentWithType(accountSelector, AccountGroup);
-    TestUtils.Simulate.click(accountGroup);
-  }).then(() => {
-    expect(accountSelector.state.selectedAccounts.length).toBe(0);
-    done();
+    TestUtils.Simulate.click(accounts[1]);
+    then(() => {
+      accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+      TestUtils.Simulate.click(accounts[2]);
+    }).then(() => {
+      accounts = TestUtils.scryRenderedComponentsWithType(accountSelector, Account);
+      TestUtils.Simulate.click(accounts[4]);
+    }).then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(3);
+  
+      var accountGroup = TestUtils.findRenderedComponentWithType(accountSelector, AccountGroup);
+      TestUtils.Simulate.click(accountGroup);
+    }).then(() => {
+      expect(accountSelector.state.selectedAccounts.length).toBe(0);
+      done();
+    });
   });
-});
 ```
 
-## TestUtils.mockComponent wont create basic mocks for me
+## TestUtils.mockComponent wont create basic mocks
+[According to the React TestUtils Docs](https://facebook.github.io/react/docs/test-utils.html#mockcomponent), you can use TestUtils.mockComponent() to create a quick mock that simply renders an empty div. However, what is not documented is that this feature is only available if you are using Jest.
+
+The intended use case is:
+```javascript jest.jsx
+TestUtils.mockComponent(jest.genMockFunction());
+```
+
+If you do need a basic dummy component, you can simply create a shared inline mock component:
+```javascript basic-mock.jsx
+class MockedSubComponent extends React.Component {
+  render () {
+    return <div></div>;
+  }
+}
+```
 
 ## Expectations won't print inside asynchronous tests
+For a regular test, you utilize _expect_ to ensure your conditions are met, and depend on its output to tell you where and why something failed. However, within an asynchronous test, this output will not come out, and instead your test will block for some time (default 5 seconds) and then fail with a generic Async timeout failure.
 
-## CTRL-C won't always kill a test
+The solution to this is to simply manually call fail.
+```javascript async-failure-integration-spec.jsx
+  it('should update the account name if its empty and we refresh it', (done) => {
+    var accountDisplay = TestUtils.renderIntoDocument(AccountDisplay);
+    TestUtils.Simulate.click(React.findDOMNode(accountDisplay.refs.refreshButton));
+    
+    // We should use the WaitFor pattern here, but I'll show it without it to illustrate the manual failure
+    setTimeout(() => {
+      // if we call expect here and it fails, we won't get the right error message, but instead an async timeout message
+      if (accountDisplay.state.accountName !== 'Test Account 1234') {
+        fail('The account name was not updated after refreshing the display and waiting 2 seconds. Found: ' + accountDisplay.state.accountName);
+      }
+      done(); // the done call ensures our test does not timeout, nor waste any extra time. It is called even if fail was called
+    }, 2000);
+  });
+```
+
+This is also how the WaitFor pattern works.
+
+## Mocked dependencies must be searched for my their mock class
+Mocking with rewire in javascript does not provide full polymorphism - if you override a mock class my name, any reference to the original will now be a mock component, but the _type_ of the new components will be MockComponent.
+ 
+This means you have to search for sub-components by their mock classes name, rather than their original name:
+```javascript my-component-mocked-spec.jsx
+
+  class MockAvatar extends React.Component {
+    render () {...}
+  }
+
+  it('should be rendered with an Avatar as a child', () => {
+    withMocks(Profile, {
+      Avatar: MockAvatar
+    }, () => {
+      profile = TestUtils.renderIntoDocument(<Profile />);
+      
+      // Wrong
+      var child = ReactTestUtils.findRenderedComponentWithType(Profile, Avatar);
+      expect(ReactTestUtils.isCompositeComponentWithType(child, Avatar)).toBe(true);
+
+      // Right
+      var child = ReactTestUtils.findRenderedComponentWithType(Profile, MockAvatar);
+      expect(ReactTestUtils.isCompositeComponentWithType(child, MockAvatar)).toBe(true);
+    });
+  });
+```
+
+This does not change how your component has to use the mocked component - it's just a technicality you have to watch out for from outside of the component.
