@@ -175,9 +175,10 @@ Utility Patterns: WaitFor, Then
     TestUtils.Simulate.click(React.findDOMNode(accountList.refs.refreshButton));
     then(() => {
       expect(wasCallbackCalled).toBe(false);
-    }, 975).then(() => {
-      waitFor(() => wasCallbackCalled, 'The onDataReceived callback was not called soon enough', done, 1025);
-    });
+      then(() => {
+        waitFor(() => wasCallbackCalled, 'The onDataReceived callback was not called soon enough', done, 1025);
+      });
+    }, 975);
   });
 ```
 
@@ -257,9 +258,9 @@ Utility Patterns: Then
 
 
 # Utility Patterns
-These patterns can make your life a lot easier, and make your tests cleaner to boot. Apply liberally.
+These patterns can make your life a lot easier, and make your tests cleaner to boot. I hesitate to call them libraries as they will likely have to be tuned to your specific scenario, and there are still edge cases that are not fully handled here. But by using them as building blocks, you should be able to extrapolate to solve various problems you might encounter.
 
-## Then
+## Then 
 The Then pattern is good for sequencing of events in the event loop. Most things in React (changing this.state after a setState(), rendering after a setState) are queued immediately, so simply ensuring things run in order can make them easy to test.
 We can use expect(...) within Then's without any surprises.
 ```javascript then.js
@@ -280,12 +281,13 @@ it('should ...', (done) => {
   then(() => {
     TestUtils.Simulate.click(React.findDOMNode(component));
   }).then(() => {
-    // we gave this one an extra 100 ms
+    // we gave this one an extra 100 ms, so we need to nest further thens to ensure they run in order
     TestUtils.Simulate.click(React.findDOMNode(component));
-  }, 100).then(() => {
-    expect(...);
-    done();
-  });
+    then(() => {
+      expect(...);
+      done();
+    });
+  }, 100);
 });
 ```
 ## WaitFor
