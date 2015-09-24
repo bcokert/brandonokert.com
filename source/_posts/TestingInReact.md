@@ -81,7 +81,7 @@ Utility Patterns: WithMocks
 ```javascript my-component-spec.jsx
   it('should be rendered with an Avatar as a child', () => {
     profile = TestUtils.renderIntoDocument(<Profile />);
-    var child = ReactTestUtils.findRenderedComponentWithType(Profile, Avatar);
+    var child = ReactTestUtils.findRenderedComponentWithType(profile, Avatar);
     expect(ReactTestUtils.isCompositeComponentWithType(child, Avatar)).toBe(true);
   });
 ```
@@ -98,7 +98,7 @@ If you have mocked the child components, then you need to search for the mocked 
       Avatar: MockAvatar
     }, () => {
       profile = TestUtils.renderIntoDocument(<Profile />);
-      var child = ReactTestUtils.findRenderedComponentWithType(Profile, MockAvatar);
+      var child = ReactTestUtils.findRenderedComponentWithType(profile, MockAvatar);
       expect(ReactTestUtils.isCompositeComponentWithType(child, Avatar)).toBe(true);
     });
   });
@@ -619,11 +619,11 @@ This means you have to search for sub-components by their mock classes name, rat
       profile = TestUtils.renderIntoDocument(<Profile />);
       
       // Wrong
-      var child = ReactTestUtils.findRenderedComponentWithType(Profile, Avatar);
+      var child = ReactTestUtils.findRenderedComponentWithType(profile, Avatar);
       expect(ReactTestUtils.isCompositeComponentWithType(child, Avatar)).toBe(true);
 
       // Right
-      var child = ReactTestUtils.findRenderedComponentWithType(Profile, MockAvatar);
+      var child = ReactTestUtils.findRenderedComponentWithType(profile, MockAvatar);
       expect(ReactTestUtils.isCompositeComponentWithType(child, MockAvatar)).toBe(true);
     });
   });
