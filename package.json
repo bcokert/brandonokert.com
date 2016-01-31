@@ -1,11 +1,17 @@
 {
   "name": "brandonokert.com",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "hexo": {
     "version": "3.1.1"
   },
-  "scripts": {},
+  "scripts": {
+    "draft": "hexo new draft --",
+    "publish": "hexo publish post --",
+    "dev": "hexo clean; hexo serve -p 5674 --",
+    "deploy": "hexo clean; hexo deploy -g",
+    "list": "echo '\nPosts:'; hexo list post; echo '\nPages:'; hexo list page"
+  },
   "dependencies": {
     "hexo": "^3.1.0",
     "hexo-cli": "^0.1.7",
