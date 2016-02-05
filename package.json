@@ -8,7 +8,7 @@
   "scripts": {
     "draft": "hexo new draft --",
     "publish": "hexo publish post --",
-    "dev": "hexo clean; hexo serve -p 5674 --",
+    "dev": "hexo clean; hexo serve -p 5674 --draft --",
     "deploy": "hexo clean; hexo deploy -g",
     "list": "echo '\nPosts:'; hexo list post; echo '\nPages:'; hexo list page"
   },
