@@ -13,7 +13,10 @@ function createUrlFromBase(urlBase, urlNum) {
 
 Array.prototype.map.call(sequencedImages, function (root) {
   var urlBase = root.attributes['data-base'].value;
-  var urlMaxNum = parseInt(root.attributes['data-num'].value);
+  var infoStrings = Array.prototype.map.call(root.querySelectorAll('p'), function (p) {
+    return p.innerHTML;
+  });
+  var urlMaxNum = infoStrings.length;
   var urlNum = 1;
 
   var imageArea = document.createElement('img');
@@ -23,6 +26,10 @@ Array.prototype.map.call(sequencedImages, function (root) {
   var divider = document.createElement('div');
   divider.className = '-divider';
 
+  var textArea = document.createElement('div');
+  textArea.innerHTML = infoStrings[urlNum - 1];
+  textArea.className = '-textArea';
+
   var leftButton = document.createElement('img');
   leftButton.className = '-control -left -disabled';
   leftButton.src = icons.prev;
@@ -31,8 +38,10 @@ Array.prototype.map.call(sequencedImages, function (root) {
     if (urlNum > 1) {
       urlNum--;
       imageArea.src = createUrlFromBase(urlBase, urlNum);
-    } else {
-      leftButton.className = '-control -left -disabled';
+      if (urlNum === 1) {
+        leftButton.className = '-control -left -disabled';
+      }
+      textArea.innerHTML = infoStrings[urlNum - 1];
     }
   };
   leftButton.addEventListener('click', onLeft);
@@ -45,8 +54,10 @@ Array.prototype.map.call(sequencedImages, function (root) {
     if (urlNum < urlMaxNum) {
       urlNum++;
       imageArea.src = createUrlFromBase(urlBase, urlNum);
-    } else {
-      rightButton.className = '-control -right -disabled';
+      if (urlNum === urlMaxNum) {
+        rightButton.className = '-control -right -disabled';
+      }
+      textArea.innerHTML = infoStrings[urlNum - 1];
     }
   };
   rightButton.addEventListener('click', onRight);
@@ -55,4 +66,5 @@ Array.prototype.map.call(sequencedImages, function (root) {
   root.appendChild(divider);
   root.appendChild(leftButton);
   root.appendChild(rightButton);
+  root.appendChild(textArea);
 });

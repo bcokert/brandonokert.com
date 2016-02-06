@@ -34,7 +34,15 @@ From a high level perspective, a Container and a Virtual Machine are interchange
 
 Let's compare the architecture of Virtual Machines to that of Containers. Click the arrows to cycle through the stages of the diagram.
 
-<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-1/docker-and-vms/' data-num=7 ></div>
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-1/docker-and-vms/' >
+<p>level 1asdlkj fadsjfalskfkafds lafls dkj fadls fjklhadls kjafhdkls jfa ldskjfs  lakjflkjdaflskjdfadklsjfadls kjaflsdkjfakl l fhhaflkjdshafl kjsdf alkjjsdafl dkfalksd hasdfkja fjkadsfl djk</p>
+<p>level 2</p>
+<p>level 3</p>
+<p>levellevel 1asdlkj fadsjfalskfkafds lafls dkj fadls fjklhadls kjafhdkls jfa ldskjfs  lakjflkjdaflskjdfadklsjfadls kjaflsdkjfakl l fhhaflkjdshafl kjsdf alkjjsdafl dkfalksd hasdfkja fjkadsfl djklevel 1asdlkj fadsjfalskfkafds lafls dkj fadls fjklhadls kjafhdkls jfa ldskjfs  lakjflkjdaflskjdfadklsjfadls kjaflsdkjfakl l fhhaflkjdshafl kjsdf alkjjsdafl dkfalksd hasdfkja fjkadsfl djk 4</p>
+<p>level 5</p>
+<p>level 6</p>
+<p>level 7</p>
+</div>
 
 ## Docker Ideologies
 
