@@ -10,7 +10,8 @@
     "publish": "hexo publish post --",
     "dev": "hexo clean; hexo serve -p 5674 --draft --",
     "deploy": "hexo clean; hexo deploy -g",
-    "list": "echo '\nPosts:'; hexo list post; echo '\nPages:'; hexo list page"
+    "list": "echo '\nPosts:'; hexo list post; echo '\nPages:'; hexo list page",
+    "fix-images": "mkdir out; mogrify *.png -path ./out -gravity South -chop 0x18 *.png"
   },
   "dependencies": {
     "hexo": "^3.1.0",

@@ -5,9 +5,14 @@
   height:64px;
 }
 
+li {
+  margin-bottom: 0.25em;
+}
+
 .sequenced-image {
   display: block;
   position: relative;
+  margin: 0 0 1.75em;
 
   background-color: #ffffff;
 
