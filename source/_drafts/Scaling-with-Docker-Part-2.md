@@ -287,14 +287,213 @@ As you're testing, you'll probably create a lot of junk containers. You can nuke
 
 ## Finishing off our Docker Host
 
-The initial docker host is almost good to go.
+The initial docker host is almost good to go. All we're missing from the original image is the database container and our data volume.
 
+Our simple server doesn't need a database, and each database has different requirements. However, if you've managed to set up your service to use your database, the configuration will be very similar, since we won't be scaling the database (due to the [CAP theorem](http://robertgreiner.com/2014/08/cap-theorem-revisited/) - later we'll see how to add consul to our service to provide a different kind of scaled data).
+
+So to keep our focus on scaling, I'll be skipping the database for now. At the end of this tutorial, I'll go over a sample scaled application that makes full use of a database, so don't fret!
+
+As for the data volume, I suggest [reading this](https://docs.docker.com/engine/userguide/containers/dockervolumes/), which will teach you everything you need to know about volume containers.
+
+## Deploying to our Host
+
+We're ready to start deploying our containers! Because creating and destroying containers is so easy, we can test our full system deployment locally before doing so on our dev, staging, or production hosts.
+
+You'll need a Host to test this. However, if you don't have one, just stick with the docker-machine provided hosts for now. You could even play with docker-machine and create a staging host, if you really want to separate things.
+
+All you need to do is ssh into the host, and run the same docker commands as usual. In the next section, where we start scaling, we'll go over creating a deploy script that does all the work for us.
+
+Let's get to scaling!
 
 # Scaling Docker Services
 
-## Horizontally Scaling
+Believe it or not, setting up the initial Docker Host will probably take longer that scaling it, since further work uses the same techniques we've just covered. If you already had a docker project that you just wanted to scale, here's where you'll really jump in.
+
+You can work through the code examples, or run <code>git checkout step4</code> to look at the complete example. 
+
+## Simple Horizontally Scaling
+
+First up we need to scale our service horizontally. In non-docker speak, this just means having multiple servers available, so that if one goes down we're alright, and if we have a lot of requests, we can distribute them.
+
+This is incredibly easy to do in Docker - it's one of the reasons docker is nice to deploy with.
+
+```sh
+> docker run -d --name simple_1 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
+> docker run -d --name simple_2 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
+> docker run -d --name simple_3 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
+> docker run -d --name simple_4 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
+```
+
+Hey look at that! We just scaled our service to 4 nodes! Of course, we don't want to have to do this manually, so let's up our deploy script now.
+
+The deploy script will take several options and arguments, and take care of logging in, cleaning up containers, and generally making deployments easy. It's a little big - don't panic! Most of it is boiler plate, and the really important stuff I've separated out into sections at the bottom.
+
+First, lets create our script:
+
+```bash
+> mkdir resources/server-scripts
+> touch resources/server-scripts/deploy.sh
+> sudo chmod a+x resources/server-scripts/deploy.sh
+```
+
+Then, make it look like the following:
+
+```bash
+#!/usr/bin/env bash
+REPOSITORY=${DOCKER_REPOSITORY}
+WEB_IMAGE=simple-server
+DOCKER_MACHINE_NAME=default
+NETWORK_NAME=network
+
+# These can be modified by options/arguments
+INCLUDE_SERVERS=true
+SERVER_NAME_PREFIX=server
+
+# A function that prints the help message
+function print_usage {
+  echo "Usage:"
+  echo "  deploy.sh [-h|--help] num_servers"
+  echo
+  echo "Options:"
+  echo "  -h|--help            Display this help"
+  echo "  --prefix             The prefix for the names of each server container"
+  echo
+  echo "Arguments:"
+  echo "  num_servers          The number of servers to create"
+}
+
+# Process the options and arguments
+if [[ $# == 0 ]]; then print_usage; exit 1; fi
+while [[ $# > 0 ]] ; do key="$1"
+case ${key} in
+    -h|--help) print_usage; exit 0;;
+    --prefix) SERVER_NAME_PREFIX=$2; shift;;
+    -*) echo "Illegal Option: ${key}"; print_usage; exit 1;;
+    *) break;
+esac
+shift
+done
+
+# Verify the options and arguments
+reNumber='^[0-9]+$'
+if [ ${INCLUDE_SERVERS} = true ]; then
+  if [[ $1 =~ $reNumber ]]; then
+    NUM_SERVERS=$1
+  else
+    echo "First arg must be a number. Received: '$1'"; print_usage; exit 1
+  fi
+fi
+
+# Verify that the docker machine is running
+if which docker-machine | grep -q /*/docker-machine; then
+  echo "Connecting to Docker VM..."
+  eval "$(docker-machine env ${DOCKER_MACHINE_NAME})"
+fi
+
+# Verify that the network has been created, and create it if not
+if ! docker network ls | grep -q ${NETWORK_NAME}; then
+  docker network create ${NETWORK_NAME}
+fi
+
+# Log in to Docker Hub
+echo "Checking that you are logged in to docker hub..."
+if ! docker info | grep -q Username; then
+  echo "You must login to push to docker Hub (you only need to do this once):"
+  docker login
+else
+  echo "Successfully logged in!"
+fi
+
+
+
+
+
+### SIMPLE SERVERS
+if [ ${INCLUDE_SERVERS} = true ]; then
+  echo "Deploying Web Servers..."
+
+  echo "Pulling latest server image..."
+  docker pull ${REPOSITORY}/${WEB_IMAGE}
+
+  echo "Cleaning up any existing containers..."
+  if docker ps -a | grep -q ${SERVER_NAME_PREFIX}; then
+    docker rm -f $(docker ps -a | grep ${SERVER_NAME_PREFIX} | cut -d ' ' -f1)
+  else
+    echo "No existing services to remove"
+  fi
+
+  echo "Starting new server containers..."
+  for (( i=1; i<=${NUM_SERVERS}; i++ )); do
+    docker run -d --net=${NETWORK_NAME} -e SIMPLE_SERVER_PORT=8080 --name ${SERVER_NAME_PREFIX}_${i} ${REPOSITORY}/${WEB_IMAGE} /usr/local/lib/simple-service/runserver.sh
+  done
+fi
+```
+
+Let's play with the script a bit:
+
+### Usage
+```bash
+> resources/server-scripts/deploy.sh
+
+Usage:
+  deploy.sh [-h|--help] num_servers
+
+Options:
+  -h|--help            Display this help
+  --prefix             The prefix for the names of each server container
+
+Arguments:
+  num_servers          The number of servers to create
+```
+
+### Deploying some Servers
+```bash
+> resources/server-scripts/deploy.sh 4
+...
+Starting new server containers...
+cac317de62a3a066df48e7c19b6c0a50c5aac6eaec257b0a14a0e7a4702a9d40
+0318c5bfcc303b012ab9cc1f156f7e34fe86a330080b6923a99a2dec23b58178
+49cbcafbb6c9991c04deb7a4248c154694d36b7687a2623d01ce167003923b61
+98393db532114707d104cf335b0c3513a83092543f61ce0f3433416252cf077b
+
+> docker logs server_1
+Starting server on port 8080
+Serving HTTP on 0.0.0.0 port 8080 ...
+
+> dcoker logs server_4
+Starting server on port 8080
+Serving HTTP on 0.0.0.0 port 8080 ...
+```
+
+### Cleaning up old Servers
+```bash
+> resources/server-scripts/deploy.sh 5
+...
+
+> resources/server-scripts/deploy.sh 10
+...
+Cleaning up any existing containers...
+f4a9e5cc8175
+d5fe92720d43
+fa11554a47b3
+cb718508c0d3
+775ba33136b9
+Starting new server containers...
+3050f23df4c4a5518309d031dd2bca0b8b4064416bd39d6bc8f80950c0240b11
+0414c63df057465524709c799993705287565076f37cf56596afb479e6d6e23f
+7d74047078efa87a725ef1db94393c649f5db8ab4629f415069a70b94187986f
+654b7bc662fd8d6e7587814cd1db924c1b66acbffd7c0734fdaad00ac181ad7f
+0c6bd3d2cc52ec15a49058f24b803c18bf50f930221019220f18d2e5f02b7c63
+7f1c99f9f2f1a9250e7b86aa848f7871d25eb043e9e8eb705e379abd1684f052
+3a7397f1a0bdb172ae5b8c80539f5e4c35d41b7ad92e766280a1b0e452a1f663
+6ad940128667d3170a9bfdbb11e229690d8311c1877e747a9f8a9161aa0d8a27
+06a1f298fc0c4d696f508c257aea496ea4981c5c37ae4856f77193af8ab32516
+0de416ccd931b17f085ce8ffdd381e75fb74316b9a805877d7725d272f2e7b28
+```
 
 ## Load Balancing
+
+So we've got horizontally scaling 
 
 ## Service Discovery
 
