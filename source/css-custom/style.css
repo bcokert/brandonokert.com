@@ -83,3 +83,11 @@ li {
 .sequenced-image:after {
   clear: both;
 }
+
+
+
+p.follow-prompt {
+  font-size:12px;
+  margin-left: 4em;
+  opacity: 0.8;
+}

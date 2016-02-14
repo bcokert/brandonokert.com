@@ -22,45 +22,23 @@ summary: Scaling Docker with Examples
 
 This is the second in a two part blog about Scaling with Docker. In this part, we'll take what we learned in Part 1 and use it to create a scalable and resilient service with Docker. While the previous part took a more conceptual route, this part will focus more on practical applications. We'll incrementally build up a set of scripts to manage deploying our hosts, applying each concept as it's described. Then I'll show you how you can use the same techniques on multiple services, and finally give an overview of how to scale massively, to thousands of hosts.
 
-I've implemented an example project on [github](https://github.com/bcokert/scaling-with-docker-example). You can clone that and look at the code at each stage if you don't have a server you want to try it with yourself. Just checkout the specified tag in each section to see it as it was.
+I've implemented an example project on [github](https://github.com/bcokert/scaling-with-docker-example). As you go through the steps here, I'll let you know when to check out different tags, if you want to follow along with the code.
 
 # Getting Ready
 
 I'll be going step by step on how to set things up on OSX and Linux in parallel (since setting up on Linux is basically a subset of the OSX requirements). If you're on Windows, the steps for OSX will be almost the same, but you'll have to translate terminal commands as necessary.
 
-We're going to need a few things to build our Docker host. We need a service to work with. We need to install Virtual Box to run our docker hosts (linux servers can be hosts, but you'll want more than 1 for testing). And we'll need Docker itself.
+We're going to need a few things to build our Docker host. We need a service to work with. We need to install Virtual Box to run our docker hosts. And we'll need Docker itself.
 
 ## Service
 
-If you've already got a service you want to test with, great! The steps I'll provide will apply to any service that produces a standalone executable. For environments like Apache/PHP, I'll point out how it differs.
+<p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step1</code></p>
 
-If you don't have a service, don't fret! I'll be using a toy service in all of my examples, so that it's easy to run a working version.
+If you've already got a service you want to test with, great! If not, I'll be using a toy service in all of my examples, so that it's easy to play with the scaling without dealing with a complex service. To use your service instead of the toy one, just replace the toy service with yours in the build-scripts and deploy-scripts - I'll point out where you need to do this.
 
-If you want to use the toy service, please do the following:
-```bash
-> mkdir src
-> touch src/runserver.sh
-> sudo chmod a+x src/runserver.sh
-> touch src/example1.html
-> touch src/example2.html
-> export SIMPLE_SERVER_PORT=8080
-```
+You can test the toy service by going into the src folder and running <code>./start.sh.</code> Then browse to <code>localhost:8080/example1.html</code> to see if it hits our "endpoint". I've made 2 endpoints for your testing pleasure.
 
-Then edit runserver.sh to look like this:
-```bash runserver.sh
-#!/bin/sh
-
-echo "Starting server on port $SIMPLE_SERVER_PORT"
-python -m SimpleHTTPServer $SIMPLE_SERVER_PORT
-```
-
-Finally, put some valid html into example1.html and example2.html. If you're familiar with python simple server, feel free to set it up however you like - just make sure the port is an environment variable.
-
-You can test it by going into the src folder and running <code>./start.sh.</code> Then browse to <code>localhost:8080/example1.html</code> to see if it hits our "endpoint".
-
-Later when we develop the build and deploy scripts, we'll "build" it by just copying the content of src/ to build/.
-
-If you want to see this step in the example project, run <code>git checkout step1</code>.
+Later when we develop the build and deploy scripts, we'll "build" it by just copying the content of <code>src/</code> to <code>build/</code>.
 
 ## Virtual Box
 
@@ -72,7 +50,7 @@ We'll be using Docker Machine to actually create and manage our VM's, so once yo
 
 On linux, you can install each package individually. On OSX and Windows, installing Toolbox will install everything else you need.
 
-I'm going to leave the installing to the [fine documentation on the docker website](https://docs.docker.com/engine/installation/), as it's pretty comprehensive, and changes from version to version.
+I'm going to leave the installing to the [fine documentation on the docker website](https://docs.docker.com/engine/installation/), as it's pretty comprehensive, and the instructions change from version to version.
 
 # Building a Docker Host
 
@@ -96,12 +74,7 @@ We'll need a few scripts by the end:
 
 ## Creating a Dockerfile
 
-Let's jump right into the first Dockerfile.
-
-```bash
-> mkdir -p resources/dockerfiles
-> touch resources/dockerfiles/dockerfile-server
-```
+<p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step2</code>.</p>
 
 Remember the process of creating an image from a dockerfile?
 
@@ -114,62 +87,31 @@ Remember the process of creating an image from a dockerfile?
 <p>Once you've created, pushed up, and pulled down an image, you can create a container via the docker run command. The path to init script would have been copied over when you installed the application artifact.</p>
 </div>
 
-Let's create a dockerfile for our service by opening up <code>dockerfile-server</code>.
+Our first dockerfile is in <code>resources/dockerfiles/dockerfile-server</code>.
 
-```
-# Use an alpine linux distro (nice and small), that already has python as a base
-FROM python:2.7-alpine
-
-# Dependencies
-# Put any dependencies here, eg:
-# RUN apt-get install java
-
-# Server
-# change directory to the given location, running future commands in it
-WORKDIR /usr/local/lib
-# copy output_dir/simple-service folder to /usr/local/lib/simple-service
-COPY simple-service simple-service/
-# set an environment variable. We'll see another way to set these shortly
-ENV SIMPLE_SERVICE_PORT 8080
-# open port 8080 from container to dockerhost
-EXPOSE 8080
-```
-
-Notice that we don't build our application here - we run the dockerfile _after_ we've compiled our project.
-
-If you want to see this step in the example project, run <code>git checkout step2</code>.
+An important note if you're getting started with docker - the Dockerfile doesn't build our application. It only builds our _image_. It assumes we've already build the application by the time we run the dockerfile.
 
 ## Creating and Storing Images
 
-We can compile our image simply by running:
-```bash
-> docker build -t REPOSITORY_NAME/IMAGE_NAME:VERSION_NAME BUILD_DIRECTORY -f DOCKERFILE_NAME
-```
-
-For example: <code>docker build -t mycompany/webservice:latest ./build -f dockerfile-server</code>.
-
-However, this requires we already have a registry setup, and a docker host ready to go. If you don't want to build the image yourself, you can download a ready to go image from [my dockerhub repo](https://hub.docker.com/r/bcokert/simple-server/), which I'll cover below.
+We can now create our image. However, this requires we already have a registry setup.
+ 
+Don't want to build the image yourself? You can download a ready to go image from [my dockerhub repo](https://hub.docker.com/r/bcokert/simple-server/). I'll show you how in the next section.
 
 ### Registry
 
-If you've got a registry already, feel free to use it. Otherwise, take a minute to go to [dockerhub](https://hub.docker.com/) and setup an account, then [create a repository](https://hub.docker.com/add/repository/) called <code>example-server</code>.
+If you've got a registry already, feel free to use it. Otherwise, take a minute to go to [dockerhub](https://hub.docker.com/) and setup an account. If you're following along with the code examples, go ahead and [create a repository](https://hub.docker.com/add/repository/) called <code>example-server</code>. Once you've done so, you can login to dockerhub via <code>docker login</code>.
 
-Once you've done so, you can login to dockerhub via <code>docker login</code>.
+To use my pre-built image instead of building your own just run <code>docker pull bcokert/simple-service</code>.
 
 ### Docker Host
 
-For most of this tutorial we'll be using the default box. There's nothing special about this box, except that in docker 1.10 and higher if you omit the name in commands, it will automatically look for a machine called "default":
+For most of this tutorial we'll be using the default machine. There's nothing special about this machine, except that in docker 1.10 and higher if you omit the name in commands, it will automatically look for a machine called "default".
 
-```bash
-> docker-machine create --driver virtualbox default
-...
+<code>docker-machine create --driver virtualbox default </code>
+
+Once it's done, you can log into it via <code>docker-machine ssh default</code>, and then use your docker commands from there. However, with docker-machine it is common to export some environment variables to enable using docker directly from your terminal.
+
 ```
-
-Once it's done, you can technically log into it via <code>docker-machine ssh default</code>, and then use your docker commands from there. However, with docker-machine it is common to export some environment variables to enable using docker directly from your terminal.
-
-To see what these are, go ahead and run <code>docker-machine env default</code> (remember, if you omit the name, it automatically uses default):
-
-```bash
 > docker-machine env default
 export DOCKER_TLS_VERIFY="1"
 export DOCKER_HOST="tcp://192.168.99.100:2376"
@@ -177,121 +119,48 @@ export DOCKER_CERT_PATH="/Users/username/.docker/machine/machines/default"
 export DOCKER_MACHINE_NAME="default"
 ```
 
-You can either run <code>eval "$(docker-machine env default)"</code> in your terminal before using docker (I use an alias for different machines), or you can put that directly into your bash_profile if you only plan on using the default machine. If you run fish terminal (or a more esoteric one), you might need to [pass something special to the --shell option of env](https://docs.docker.com/machine/reference/env/).
+You run <code>eval "$(docker-machine env default)"</code> in your terminal before using docker (I use an alias for different machines). If you run fish terminal (or a more esoteric one), you might need to [pass something special to the --shell option of env](https://docs.docker.com/machine/reference/env/).
 
 ### Putting it together
 
-Instead of pushing up manually, we're going to go right to automating our build process to make this is quicker down the road:
+<p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step3</code>.</p>
 
-```bash
-> mkdir resources/dev-scripts
-> touch resources/dev-scripts/build-service.sh
-> sudo chmod a+x resources/dev-scripts/build-service.sh
-```
+Instead of pushing up manually, we're going to go right to automating our build process to make this is quicker down the road.
 
-Let's edit the <code>build-server.sh</code> to automatically check that we're logged in, check that the default machine is running, create an image, and push it up to dockerhub for us. I've used an environment variable, <code>DOCKER_REPOSITORY</code>, to store our repository name so you don't need to copy paste your own repo in all the time.
+The <code>resources/dev-scripts/build-service.sh</code> script automatically checks that we're logged in to docker hub, makes sure the right docker machine is running and available, creates our image, and pushes it up to our repository for us. If you're following along and have your own repository, use the environment variable <code>DOCKER_REPOSITORY</code> to avoid having to copy paste your repository all over the place.
 
-```bash
-#!/usr/bin/env bash
-ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/../..
-SOURCE_DIR=${ROOT_DIR}/src
-RESOURCE_DIR=${ROOT_DIR}/resources
-DOCKERFILE_DIR=${RESOURCE_DIR}/dockerfiles
-ARTIFACT_DIR=${ROOT_DIR}/build
-OUTPUT_DIR=${ROOT_DIR}/release-server-tmp
-
-DOCKER_MACHINE_NAME=default
-REPOSITORY=${DOCKER_REPOSITORY}
-DOCKER_FILE_NAME=dockerfile-server
-IMAGE=simple-server
-
-# Some nice red text for the terminal
-ERROR_TXT="\033[1m\033[41m\033[97mERROR:\033[0m"
-
-echo "Checking that docker VM is available..."
-if ! docker-machine ls | grep -q ${DOCKER_MACHINE_NAME}; then
-  echo -e "${ERROR_TXT} Docker VM is not created. Please run 'docker-machine create --driver virtualbox ${DOCKER_MACHINE_NAME}'"
-  exit 1
-elif ! docker-machine ls | grep -q ${DOCKER_MACHINE_NAME}.*Running; then
-  echo -e "${ERROR_TXT} Docker VM is not running. Please run 'docker-machine start ${DOCKER_MACHINE_NAME}'"
-  exit 1
-fi
-
-echo "Cleaning any old release files..."
-rm -rf ${OUTPUT_DIR}
-mkdir ${OUTPUT_DIR}
-
-echo "Building project..."
-# Build your project here, if applicable
-cp -r ${SOURCE_DIR}/ ${OUTPUT_DIR}/simple-service # "Build" our toy service
-
-echo "Preparing build artifacts for docker imaging..."
-# Do any post-build setup here, like unzipping files
-cp ${DOCKERFILE_DIR}/${DOCKER_FILE_NAME} ${OUTPUT_DIR}
-
-echo "Connecting to Docker VM..."
-eval "$(docker-machine env ${DOCKER_MACHINE_NAME})"
-
-echo "Building Docker Image..."
-ls ${OUTPUT_DIR}
-ls ${OUTPUT_DIR}/simple-service
-docker build -t ${REPOSITORY}/${IMAGE}:latest -f ${OUTPUT_DIR}/${DOCKER_FILE_NAME} ${OUTPUT_DIR} || exit 1
-docker images | grep ${IMAGE} # list our new images info
-
-echo "Cleaning up build artifacts..."
-rm -rf ${OUTPUT_DIR}
-
-echo "Checking that you are logged in to docker hub..."
-if ! docker info | grep -q Username; then
-  echo "You must login to push to docker Hub (you only need to do this once):"
-  docker login
-else
-  echo "Succesfully logged in!"
-fi
-
-echo "Pushing docker images..."
-echo "If this fails saying it's already in progress, try 'docker-machine restart ${DOCKER_MACHINE_NAME}'"
-docker push ${REPOSITORY}/${IMAGE}
-```
-
-If you want to see this step in the example project, run <code>git checkout step3</code>. If you don't want to build the image, you can use a prebuilt one [in my dockerhub repo](https://hub.docker.com/r/bcokert/simple-server/). Just run <code>docker pull bcokert/simple-server</code>.
+The key part of the build processes is building our actual project - compiling, bundling, minifying, or whatever "building" means for your project. The end result should be a set of artifacts, which we then just copy into our image.
 
 ## Testing our Image
 
 Let's give this container a quick test to make sure it's setup properly:
 
-```sh
-> docker pull ${DOCKER_REPOSITORY}/simple-server
-> docker run --name simple-server-test ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh
-...
+```
+> docker run --name simple-server-test ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh</code>
 ```
 
 When you do this, your terminal will start receiving logs from that container. Kill it with ctrl-C, remove the now stopped container with <code>docker rm simple-server-test</code>, and re-run it as a daemon container:
 
-```sh
+```
 > docker run -d --name simple-server-test ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh
 ```
 
 Now that it's running in the background, let's check on it:
 
-```sh
+```
 > docker ps -a                    # list all containers and some metadata about them
 > docker logs simple-server-test  # show the stdout of the process that was run within your container
 > docker rm -f simple-server-test # destroy the container, even if it is currently running
 ```
 
 As you're testing, you'll probably create a lot of junk containers. You can nuke them all via:
-```sh
+```
 > docker rm -f $(docker ps -a -q)
 ```
 
 ## Finishing off our Docker Host
 
-The initial docker host is almost good to go. All we're missing from the original image is the database container and our data volume.
-
-Our simple server doesn't need a database, and each database has different requirements. However, if you've managed to set up your service to use your database, the configuration will be very similar, since we won't be scaling the database (due to the [CAP theorem](http://robertgreiner.com/2014/08/cap-theorem-revisited/) - later we'll see how to add consul to our service to provide a different kind of scaled data).
-
-So to keep our focus on scaling, I'll be skipping the database for now. At the end of this tutorial, I'll go over a sample scaled application that makes full use of a database, so don't fret!
+Our simple server doesn't need a database, and each database has different requirements. However, if you've managed to set up your service to use your database, the configuration will be very similar. So to keep our focus on scaling, I'll be skipping the database for now. At the end of this tutorial, I'll go over a sample scaled application that makes full use of a database, so don't fret!
 
 As for the data volume, I suggest [reading this](https://docs.docker.com/engine/userguide/containers/dockervolumes/), which will teach you everything you need to know about volume containers.
 
@@ -301,140 +170,37 @@ We're ready to start deploying our containers! Because creating and destroying c
 
 You'll need a Host to test this. However, if you don't have one, just stick with the docker-machine provided hosts for now. You could even play with docker-machine and create a staging host, if you really want to separate things.
 
-All you need to do is ssh into the host, and run the same docker commands as usual. In the next section, where we start scaling, we'll go over creating a deploy script that does all the work for us.
+All you need to do is ssh into the host, and run the same docker commands as usual (no need to ssh if you're using docker-machine). In the next section, where we start scaling, we'll go over creating a deploy script that does all the work for us.
 
 Let's get to scaling!
 
 # Scaling Docker Services
 
-Believe it or not, setting up the initial Docker Host will probably take longer that scaling it, since further work uses the same techniques we've just covered. If you already had a docker project that you just wanted to scale, here's where you'll really jump in.
-
-You can work through the code examples, or run <code>git checkout step4</code> to look at the complete example. 
+Believe it or not, setting up the initial Docker Host will probably take longer that scaling it, since further work uses the same techniques we've just covered.
 
 ## Simple Horizontally Scaling
 
-First up we need to scale our service horizontally. In non-docker speak, this just means having multiple servers available, so that if one goes down we're alright, and if we have a lot of requests, we can distribute them.
+<p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step4</code>.</p>
+
+First we need to scale our service horizontally. In non-docker speak, this just means having multiple servers available, so that if one goes down we're alright, and if we have a lot of requests, we can distribute them.
 
 This is incredibly easy to do in Docker - it's one of the reasons docker is nice to deploy with.
 
-```sh
+```
 > docker run -d --name simple_1 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
 > docker run -d --name simple_2 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
 > docker run -d --name simple_3 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
 > docker run -d --name simple_4 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
 ```
 
-Hey look at that! We just scaled our service to 4 nodes! Of course, we don't want to have to do this manually, so let's up our deploy script now.
+Hey look at that! We just scaled our service to 4 nodes! Of course, we don't want to have to do this manually, so let's setup our deploy script now.
 
-The deploy script will take several options and arguments, and take care of logging in, cleaning up containers, and generally making deployments easy. It's a little big - don't panic! Most of it is boiler plate, and the really important stuff I've separated out into sections at the bottom.
-
-First, lets create our script:
-
-```bash
-> mkdir resources/server-scripts
-> touch resources/server-scripts/deploy.sh
-> sudo chmod a+x resources/server-scripts/deploy.sh
-```
-
-Then, make it look like the following:
-
-```bash
-#!/usr/bin/env bash
-REPOSITORY=${DOCKER_REPOSITORY}
-WEB_IMAGE=simple-server
-DOCKER_MACHINE_NAME=default
-NETWORK_NAME=network
-
-# These can be modified by options/arguments
-INCLUDE_SERVERS=true
-SERVER_NAME_PREFIX=server
-
-# A function that prints the help message
-function print_usage {
-  echo "Usage:"
-  echo "  deploy.sh [-h|--help] num_servers"
-  echo
-  echo "Options:"
-  echo "  -h|--help            Display this help"
-  echo "  --prefix             The prefix for the names of each server container"
-  echo
-  echo "Arguments:"
-  echo "  num_servers          The number of servers to create"
-}
-
-# Process the options and arguments
-if [[ $# == 0 ]]; then print_usage; exit 1; fi
-while [[ $# > 0 ]] ; do key="$1"
-case ${key} in
-    -h|--help) print_usage; exit 0;;
-    --prefix) SERVER_NAME_PREFIX=$2; shift;;
-    -*) echo "Illegal Option: ${key}"; print_usage; exit 1;;
-    *) break;
-esac
-shift
-done
-
-# Verify the options and arguments
-reNumber='^[0-9]+$'
-if [ ${INCLUDE_SERVERS} = true ]; then
-  if [[ $1 =~ $reNumber ]]; then
-    NUM_SERVERS=$1
-  else
-    echo "First arg must be a number. Received: '$1'"; print_usage; exit 1
-  fi
-fi
-
-# Verify that the docker machine is running
-if which docker-machine | grep -q /*/docker-machine; then
-  echo "Connecting to Docker VM..."
-  eval "$(docker-machine env ${DOCKER_MACHINE_NAME})"
-fi
-
-# Verify that the network has been created, and create it if not
-if ! docker network ls | grep -q ${NETWORK_NAME}; then
-  docker network create ${NETWORK_NAME}
-fi
-
-# Log in to Docker Hub
-echo "Checking that you are logged in to docker hub..."
-if ! docker info | grep -q Username; then
-  echo "You must login to push to docker Hub (you only need to do this once):"
-  docker login
-else
-  echo "Successfully logged in!"
-fi
-
-
-
-
-
-### SIMPLE SERVERS
-if [ ${INCLUDE_SERVERS} = true ]; then
-  echo "Deploying Web Servers..."
-
-  echo "Pulling latest server image..."
-  docker pull ${REPOSITORY}/${WEB_IMAGE}
-
-  echo "Cleaning up any existing containers..."
-  if docker ps -a | grep -q ${SERVER_NAME_PREFIX}; then
-    docker rm -f $(docker ps -a | grep ${SERVER_NAME_PREFIX} | cut -d ' ' -f1)
-  else
-    echo "No existing services to remove"
-  fi
-
-  echo "Starting new server containers..."
-  for (( i=1; i<=${NUM_SERVERS}; i++ )); do
-    docker run -d --net=${NETWORK_NAME} -e SIMPLE_SERVER_PORT=8080 --name ${SERVER_NAME_PREFIX}_${i} ${REPOSITORY}/${WEB_IMAGE} /usr/local/lib/simple-service/runserver.sh
-  done
-fi
-```
+The <code>resources/server-scripts/deploy.sh</code> script takes several options and arguments. It takes care of logging in, checking that our docker machine is ok, cleaning up existing containers, and generally making deployments easy.
 
 Let's play with the script a bit:
 
-### Usage
-```bash
+```
 > resources/server-scripts/deploy.sh
-
 Usage:
   deploy.sh [-h|--help] num_servers
 
@@ -444,64 +210,197 @@ Options:
 
 Arguments:
   num_servers          The number of servers to create
-```
 
-### Deploying some Servers
-```bash
+
 > resources/server-scripts/deploy.sh 4
 ...
 Starting new server containers...
-cac317de62a3a066df48e7c19b6c0a50c5aac6eaec257b0a14a0e7a4702a9d40
-0318c5bfcc303b012ab9cc1f156f7e34fe86a330080b6923a99a2dec23b58178
-49cbcafbb6c9991c04deb7a4248c154694d36b7687a2623d01ce167003923b61
-98393db532114707d104cf335b0c3513a83092543f61ce0f3433416252cf077b
+cac317de62a3
+0318c5bfcc30
+49cbcafbb6c9
+98393db53211
+
 
 > docker logs server_1
 Starting server on port 8080
 Serving HTTP on 0.0.0.0 port 8080 ...
 
-> dcoker logs server_4
+
+> docker logs server_4
 Starting server on port 8080
 Serving HTTP on 0.0.0.0 port 8080 ...
-```
 
-### Cleaning up old Servers
-```bash
-> resources/server-scripts/deploy.sh 5
-...
 
 > resources/server-scripts/deploy.sh 10
 ...
 Cleaning up any existing containers...
-f4a9e5cc8175
-d5fe92720d43
-fa11554a47b3
-cb718508c0d3
-775ba33136b9
+cac317de62a3
+0318c5bfcc30
+49cbcafbb6c9
+98393db53211
 Starting new server containers...
-3050f23df4c4a5518309d031dd2bca0b8b4064416bd39d6bc8f80950c0240b11
-0414c63df057465524709c799993705287565076f37cf56596afb479e6d6e23f
-7d74047078efa87a725ef1db94393c649f5db8ab4629f415069a70b94187986f
-654b7bc662fd8d6e7587814cd1db924c1b66acbffd7c0734fdaad00ac181ad7f
-0c6bd3d2cc52ec15a49058f24b803c18bf50f930221019220f18d2e5f02b7c63
-7f1c99f9f2f1a9250e7b86aa848f7871d25eb043e9e8eb705e379abd1684f052
-3a7397f1a0bdb172ae5b8c80539f5e4c35d41b7ad92e766280a1b0e452a1f663
-6ad940128667d3170a9bfdbb11e229690d8311c1877e747a9f8a9161aa0d8a27
-06a1f298fc0c4d696f508c257aea496ea4981c5c37ae4856f77193af8ab32516
-0de416ccd931b17f085ce8ffdd381e75fb74316b9a805877d7725d272f2e7b28
+3050f23df4c4
+0414c63df057
+7d74047078ef
+654b7bc662fd
+0c6bd3d2cc52
+7f1c99f9f2f1
+3a7397f1a0bd
+6ad940128667
+06a1f298fc0c
+0de416ccd931
 ```
 
-## Load Balancing
+## Load Balancing and Service Discovery
 
-So we've got horizontally scaling 
+So we've got horizontally scaling containers. But we don't want people to have to connect to them manually, and we'd like them to be used equally. That's where load balancing comes in:
 
-## Service Discovery
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/load-balancing/' >
+<p>Here's a host as with a single container.</p>
+<p>To scale it horizontally, we just have to add more containers. This is dead simple with docker.</p>
+<p>Finally, we load balance them behind a reverse proxy - all requests can go to the proxy instead of the servers, and it'll take care of sharing the load.</p>
+</div>
 
-## DNS Basics
+Haproxy was chosen here simply because it's performant, scales well, and is highly configurable.
+
+At this point, we can make a scalable service, by scaling our service containers and putting them behind reverse-proxy nodes. If we increase the number of containers and services, an important pattern shows up:
+
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/adding-services/' >
+<p>Let's start with a basic host.</p>
+<p>We could add more services by just adding different container types. But this won't scale well.</p>
+<p>So instead, we'll create _One Service Per Docker Host_. Each Host is the same - same configuration, same deployment process. It just has a different service container inside.</p>
+<p>Scaling is now just a matter of adding containers.</p>
+<p>We can add containers where they're needed...</p>
+<p>...thus scaling each host independently.</p>
+<p>We can even scale our load balancers the same way!</p>
+</div>
+
+To add a load balancer, we're going to need a new dockerfile for haproxy, give it some basic configuration, then update our deploy script. You probably already have an idea of how that would look. But hold tight! There's a key weakness in the setup we've just described that we need to address!
+
+Whenever we add or remove containers, we need to manually update our load balancers configuration, so it knows what containers to balance. Which means we have to know how many containers we have ahead of time... which means we can't scale on demand, we need to re-deploy our entire host every time we want to add or remove containers.
+
+The solution? Service Discovery:
+
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/service-discovery/' >
+<p>Service discovery first requires we keep an up to date inventory of all of our containers. In this case, I've created a few [Consul](https://www.consul.io/) servers, which will keep track of our containers internally.</p>
+<p>Each container is updated to have a [Consul Agent](https://www.consul.io/docs/agent/basics.html), which connects to the Consul Servers, thus keeping them up to date. The masters share their connected servers with each-other, to ensure consistency.</p>
+<p>If a container is added, its agent connects to the Quorum (the Servers that are still up and communicating correctly), which updates the inventory.</p>
+<p>If containers are lost, they disconnect from the Quorum, thus removing them from the inventory.</p>
+</div>
+
+This gives us an up-to-date inventory of all of our containers. All we have to do is consume this inventory. We can use another consul agent for that - put the agent on the load balancer container, and any time it sees the inventory change, update the load balancers config automatically.
+
+There's a tool built by the same people that made consul that solves this exact problem! It's called Consul Template.
+
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/consul-template/' >
+<p>We install consul-template on the load balancer container, just like a regular consul agent. As it's connected to the Consul Servers, it will automatically receive updates whenever the inventory changes.</p>
+<p>On the load balancer we put a configuration template. This is a [Go Template](https://gohugo.io/templates/go-templates/) that, when applied to the inventory, will generate our load balancers config.</p>
+<p>Upon receiving an inventory update, consul-template will apply the new inventory to the template, and generate a standard [haproxy config file](https://www.digitalocean.com/community/tutorials/how-to-use-haproxy-to-set-up-http-load-balancing-on-an-ubuntu-vps#configuring-haproxy).</p>
+<p>Finally, it tells the haproxy service to restart, which picks up the new configuration.</p>
+</div>
+
+And with that, we're finally ready to start implementing our load balanced, discoverable and auto updating docker hosts!
+
+## Testing Load Balancing and Service Discovery
+
+<p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step5</code>.</p>
+
+Now that we've gone over how service discovery and load balancing work, we can start playing with the example project to get a deeper understanding. We'll do this by using our deploy script, and looking at the various moving parts.
+
+If you're testing with a docker machine, you'll need to either login to the machine and curl endpoints to test them, or forward ports in virtual box. Since the latter is a much nicer experience, I'll go over that first.
+
+Open up virtualbox, find your machine, right click, and select settings. Then select the Network tab, and click Port Forwarding. Then setup your ports as follows (don't change the ssh one):
+
+![VirutalBox Port Configuration](/img/Scaling-With-Docker-Part-2/virtualbox-ports.png)
+
+Now you can hit your load balancers by going to <code>localhost:8X8X</code> on your local machine, and go to <code>localhost:8501/</code> to check on the status of consul:
+
+![VirutalBox Port Configuration](/img/Scaling-With-Docker-Part-2/consul-ui.png)
+
+Now lets play around with it a bit:
+
+```stuff
+> resources/server-scripts/deploy.sh
+Usage:
+  deploy.sh [-h|--help] [-c|--consul] [-l|--lb num_lbs] num_servers
+
+Options:
+  -h|--help            Display this help
+  -c|--consul          Whether to redeploy the consul servers
+  -l|--lb num          How many load balancers to deploy. Defaults to 0
+  --prefix             The prefix for the names of each server container
+
+Arguments:
+  num_servers          The number of servers to create
+
+
+> resources/server-scripts/deploy.sh -c -l 3 10
+...
+Starting new consul server containers...
+17a7391062e70
+e5126c48b5d4e
+ffaa15395ee75
+b3f4118b623b7
+b50fa883b3aec
+Giving consul servers a few seconds to elect someone...
+  The ui is available on each server, under port 850X, where X is the server number
+Finished deploying consul cluster!
+Starting new load balancer containers...
+07bd11df2998a
+d39c0a2489592
+a0c03230b1923
+Starting new server containers...
+ab74f9554cf6f
+0307d1b14f27b
+918c8f8c8cc60
+6089a9bfa0d28
+6b42d17cbcb26
+0b4115ab85b4c
+33095aba5cf6a
+eadfd5802b32c
+fbf36c26f9b4b
+b116d95d7b5cd
+
+
+> curl localhost:8181/example1.html
+...
+> curl localhost:8181/example1.html
+...
+> curl localhost:8181/example1.html
+...
+
+> docker-machine ssh
+>> docker inspect simple_haproxy_1 | grep "Mounts" -A 3
+>> sudo -i
+>> cd /mnt/sda1/var/lib/docker/volumes/4bd9e9e016c20c4628b52416fededb25bc6f2028c30c5d4a034d73cbae56b44c/_data
+>> cat haproxy_0.log
+2016-... http-in webservers/server_1 ...
+2016-... http-in webservers/server_2 ...
+2016-... http-in webservers/server_3 ...
+```
+
+You can check real time service discovery is working by destroying some containers, then checking on consul:
+ 
+```
+> docker rm -f server_1
+> docker rm -f server_4
+> docker rm -f simple_consul_3
+```
+
+![VirutalBox Port Configuration](/img/Scaling-With-Docker-Part-2/consul-ui-after-killing.png)
+
+Note that haproxy doesn't show up in the consul list because consul-template is not a typical agent - it wouldn't be that difficult to add it though.
 
 # Large Scale Docker
 
+Great! We've got a scalable resilient docker host! You can add a few more hosts, and thus more services, using the same techniques described here.
+
+This will suit most personal projects and small to medium scale deployments. But a few issues arise when you try to take this to very large scale.
+
 ## Problems With Current Solution
+
+* ...
+* ...
 
 ## General Strategy - The DCOS
 
