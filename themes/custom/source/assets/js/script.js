@@ -11437,7 +11437,7 @@ return jQuery;
             // the about card fade in and the blog fade out
             setTimeout(function() {
                 self.dropAboutCard();
-            }, 300);
+            }, 50);
         },
 
         /**
@@ -11468,7 +11468,7 @@ return jQuery;
             self.$aboutCard
                 .css('top', '0px')
                 .css('top', '-' + aboutCardHeight + 'px')
-                .show(500, function() {
+                .show(200, function() {
                     self.$aboutCard.animate({
                         top: '+=' + (($(window).height() / 2) - (aboutCardHeight / 2) + aboutCardHeight) + 'px'
                     });
@@ -11484,7 +11484,7 @@ return jQuery;
 
             self.$aboutCard.animate({
                 top: '-=' + (($(window).height() / 2) - (aboutCardHeight / 2) + aboutCardHeight) + 'px'
-            }, 500, function() {
+            }, 200, function() {
                 self.$aboutCard.hide();
             });
         }
@@ -11494,7 +11494,8 @@ return jQuery;
         var aboutCard = new AboutCard();
         aboutCard.run();
     });
-}(jQuery);;+function($) {
+}(jQuery);
+;+function($) {
     'use strict';
 
     // Filter posts by using their date on archives page : `/archives`

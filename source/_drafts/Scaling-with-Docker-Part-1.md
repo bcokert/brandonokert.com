@@ -15,20 +15,20 @@ tags:
   - large-scale
   - images
 author: Brandon Okert
-date: 2016-01-31 11:03:54
+date: 2016-02-16 8:00:00
 thumbnailImage: thumbnail.png
 summary: Getting started with Docker, from a Scaling Perspective
 ---
 
-This is the first in a two part blog about Scaling with Docker. In Part 1, we'll focus on getting started with Docker from a scaling perspective. For the most part this will be an intro to Docker, so if you're already experienced using mutli-container hosts, docker networks, volume containers, monitoring tools, and management scripts, feel free to skim this part. In Part 2, we'll use the fundamentals from Part 1 to organize scalable multi-host systems, before taking a cursory look at how to take that to very large scale.
+This is the first in a two part post about Scaling with Docker. In Part 1, we'll focus on getting started with Docker from a scaling perspective. For the most part this will be an intro to Docker, so if you're already experienced using mutli-container hosts, docker networks, volume containers, monitoring tools, and management scripts, feel free to skim this part. In Part 2, we'll use the fundamentals from Part 1 to organize scalable multi-host systems, then show where to start to take that to very large scale applications.
 
 # Getting Started
 
-Rather than telling you what Docker is and why you should use it, I'm going to start by comparing it to Virtual Machines, which are much more familiar. Then we'll jump into the what and how of Docker.
+Rather than telling you what Docker is and why you should use it, I'm going to start by comparing Docker to Virtual Machines, which are much more familiar. Then we'll jump into the what and how of Docker.
 
 ## Docker VS VM's
 
-From a system architecture perspective, a Container and a Virtual Machine are interchangeable - they both implement a host, or an environment that you can run processes and services within. But the different implementations result in changes in Performance and Lifecycle.
+From a system architecture perspective, a Container and a Virtual Machine are interchangeable - they both implement a host, or an environment that you can run processes and services within. However, the different implementations result in different Performance and Lifecycles.
 
 ### Performance
 
@@ -39,8 +39,8 @@ Let's compare the architecture of Virtual Machines to that of Containers. Click 
 <p>Both have an underlying operating system.</p>
 <p>Both have common libraries and programs available.</p>
 <p>Both need a Manager of their guests - Hypervisor for VM's and Docker Engine for Docker.</p>
-<p>Since Virtual Machines are meant to be just that, they need their own Guest Operating System.</p>
-<p>They also need a copy of these base libraries that the Host already has.</p>
+<p>Since Virtual Machines are meant to be their namesake, they need their own Guest Operating System.</p>
+<p>They also need the base libraries for the operating system - likely a huge overlap with what's already on the Host.</p>
 <p>Finally, both have the actual application code to run. This includes any dependencies or other libraries installed.</p>
 </div>
 
@@ -50,17 +50,17 @@ As you can see, Docker containers tend to be much smaller than equivalent VM's, 
 
 A VM is normally created at one point, then maintained via regular provisioning and deployment of services. You place new applications onto the existing box when it's time to update, and log in to the box to monitor, maintain, and debug it.
 
-Containers have a very different lifecycle. Containers are not provisioned; instead you build images that contain your application and configuration, then 'deploy' these images as container instances. If there are application or configuration changes, you build a new image, destroy your old containers, and create new ones with the new image.
+Containers have a very different lifecycle. Containers are not provisioned; instead you build images that contain your application and configuration, then "deploy" these images as container instances. If there are application or configuration changes, you build a new image, destroy your old containers, and create new ones with the new image.
  
-Thus where VM's typically live for a long time, changing throughout their life, containers are meant to be relatively short lived.
+Thus where VM's typically live for a long time, changing throughout their life, containers are meant to be relatively short lived. This encourages the prevailing trend of keeping containers small, and helps avoid snowflakes (servers that have diverged from their provisioned state).
 
 ## Docker Components at Scale
 
-We'll get into how to scale in Part 2, and into more detail of docker architecture in the next session. But it'll be easier to stay oriented if we have an idea of the end goal going in.
+We'll talk about the _how_ of scaling in Part 2, and dive into the architecture of Docker in the next section. But as a quick overview, these are the main actors in a scaled docker deployment:
 
-* Containers - We've already introduced Docker Containers, which are comparable to VM's. These are the basic building blocks of docker deployments, and make up our services.
-* Docker Hosts - Containers need somewhere to live, and that somewhere is Docker Hosts. These are linux machines that run 1 or more containers. We'll describe them in detail below, and how to organize them in part 2.
-* Clusters - A group of Docker Hosts make a cluster. And since each docker host has multiple containers itself, these Clusters are like clusters of clusters. Managing these clusters is the main problem address in large scale docker deployments.
+* Containers - Comparable to VM's, these are the basic building blocks of docker deployments, making up our services.
+* Docker Hosts - Containers need somewhere to live, and that somewhere is Docker Hosts. These are linux machines that run one or more containers.
+* Clusters - A group of Docker Hosts make a cluster. The term cluster is also used synonymously with the tools used to maintain them.
 
 
 
@@ -76,19 +76,19 @@ In this section we'll go over these [Tools](#Tools) and [Components](#Components
 
 ### Containers
 
-Containers have already been introduced - they are the basic building blocks of docker deployments. Containers can be created, destroyed, run, stopped, restarted, and logged into, like any VM. See the [Dockerfiles](#Dockerfiles) section for more info.
+Containers have already been introduced - they are the basic building blocks of docker deployments. Containers can be created, destroyed, run, stopped, restarted, and logged into (though the latter is usually avoided). See the [Dockerfiles](#Dockerfiles) section for more info.
 
-Though they are architecturally used like a VM, their implementation is closer to a directory. [Linux Namespaces](http://man7.org/linux/man-pages/man7/namespaces.7.html) and [cgroups](https://en.wikipedia.org/wiki/Cgroups) provide the isolation and limitation to these 'directories' that allow them to act like VM's.
+Though they are architecturally used like a VM, their implementation is closer to a directory. [Linux Namespaces](http://man7.org/linux/man-pages/man7/namespaces.7.html) and [cgroups](https://en.wikipedia.org/wiki/Cgroups) provide the isolation and limitation to these "directories" that allow them to act like VM's.
 
 ### Images
 
-Objects are to Containers as Classes are to Images. They are the definition, or blueprint, of a container. After you've built an image using a [Dockerfile](#Dockerfiles), put that image in a [Registry](#Registry), and downloaded it, you can keep using it to create any number of containers. See the [Dockerfiles](#Dockerfiles) section for more info.
+Images are like templates or blueprints for creating containers. After you've built an image using a [Dockerfile](#Dockerfiles), put that image in a [Registry](#Registry), and downloaded it, you can keep using it to create any number of containers. See the [Dockerfiles](#Dockerfiles) section for more info.
 
-Images are made of a series of layers that have a similar function to commits in git. Under the hood, they use a [Union Filesystem](https://en.wikipedia.org/wiki/UnionFS) to iteratively build up the filesystems that become your containers. 
+Images are made of a series of layers that have a similar function to commits in git. Under the hood, they use a [Union Filesystem](https://en.wikipedia.org/wiki/UnionFS) to iteratively build up the filesystems that become your containers.
 
 ### Dockerfiles
 
-Dockerfiles specify how to build [Images](#Images). As a Dockerfile (and the underlying application) evolves, so does the resulting image. A Dockerfile is a series of commands specifying a starting point for your containers, and the libraries, dependencies, and configuration your image needs to run containers.
+Dockerfiles specify how to build [Images](#Images). As a Dockerfile (and the underlying application) evolves, so does the resulting image. A Dockerfile is a series of commands specifying a starting point for your containers, and the libraries, dependencies, and configuration your image needs to run.
 
 Dockerfiles are only concerned with single images - they may specify open ports, but they do not specify other container types or networks to connect to. That is done with [Docker Engine](#Docker_Engine).
 
@@ -107,14 +107,14 @@ Each command in a Dockerfile creates a new layer, or commit. This is similar to 
 
 Containers cannot live in isolation - they are run on hosts. A Docker Host is just a linux machine (virtual or otherwise) that is running Docker Engine.
 
-For small deployments, Docker Hosts are management manually. For larger deployments, they are abstracted into clusters and managed piecemeal.
+For small deployments, Docker Hosts are managed manually. For larger deployments, they are abstracted into clusters and managed piecemeal.
 
 Docker Hosts are easy to understand if you convert a VM server into a Docker Host.
 
 <div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-1/converting-to-docker/' >
 <p>On the left is a typical server, perhaps on a VM. It's running a web service and database daemon, and storing data in some directory.</p>
 <p>First we install Docker Engine, thus converting our Host on the right into a Docker Host.</p>
-<p>Then we convert each of the processes on the left into Containers. This is a common theme - typically we want 1 main process per container.</p>
+<p>Then we convert each of the processes on the left into Containers. This is a common theme - typically we want one main process per container.</p>
 <p>Our data comes over as a Volume. This is functionally the same as before, but now the volume lives on the Host, and is mounted into each Container. This enables the data to persist beyond the life of a container, and enables sharing of data. This can be done in a read only fashion.</p>
 <p>Architecturally these hosts are nearly identical, thus we call the one on the right a Docker Host.</p>
 </div>
@@ -125,35 +125,35 @@ Volumes are the persistent storage solution for Docker. They are used heavily to
 
 Volumes can also enable sharing of data, in the case of configuration for example. You can mount them read only to ensure data is only mutated by an administrator.
 
-A common pattern with Volumes is to create Volume Containers. A Volume Container is just a container who's sole purpose is to mount one or more volumes. You can then instruct other containers to mount all volumes mounted by the Volume Container, thus making it easy to modify groups of volumes across several servers. In addition, Volume Containers make it harder to accidentally delete volumes, since the docker daemon won't allow you to delete a volume if at least one container is pointing to it. Volume Containers have no mutating functionality, and thus should not need to be destroyed very often.
+A common pattern with Volumes is to create Volume Containers. A Volume Container is just a container who's sole purpose is to mount one or more volumes. You can then instruct other containers to mount all volumes mounted by the Volume Container, thus making it easy to modify groups of volumes across several servers. In addition, Volume Containers make it harder to accidentally delete volumes, since the docker daemon won't allow you to delete a volume if at least one container is using it. Volume Containers have no mutating functionality, and thus should not need to be destroyed very often.
 
-For example, you might mount /var/data/service, /var/log/service, and /var/etc/service to a Volume Container. Then you can simply tell your database container to mount any volume in your Volume Container:
+For example, you might mount <code>/var/data/service</code>, <code>/var/log/service</code>, and <code>/var/etc/service</code> to a Volume Container. Then you can simply tell your database container to mount any volume in your Volume Container.
 
 ### Networks
 
-If you're familiar with older iterations of Docker, you may still not be familiar with Docker Networks. Docker Networks are docker's modern solution to connecting multiple containers in a private network. Previously you had to open ports manually and connect containers, or use docker links to inject the ip address and ports of containers into other via environment variables. It was not fun to maintain, even on small scale projects.
+If you're familiar with older iterations of Docker, you may still not be familiar with Docker Networks. Docker Networks are dockers modern solution to connecting multiple containers in a private network. Previously you had to open ports manually and connect containers, or use docker links to inject the ip address and ports of containers into others via environment variables. It was not fun to maintain, even on small scale projects.
  
-With networks, this process is much easier. You create networks independent from containers, specifying a global name to refer to them. Then you just tell docker containers to join them when you run them.
+With networks, this process is much easier. You create networks independent from containers, specifying a global name to refer to them. Then you just tell docker containers to join them when they're created.
 
-In Docker 1.9, this would cause the hostname and ip of all containers on a network to be injected into each containers hosts file. Thus you could easily communicate between containers by name (this was especially good for scalability, where you want to create many containers on the fly).
+In Docker 1.9, this would cause the hostname and ip of all containers on a network to be injected into each containers hosts file. Thus you could easily communicate between containers by name.
 
-Docker 1.10 improves upon this by providing a full local dns system for your containers. Docker Engine runs a dns server, which is the first server all containers will go to for addresses, and this server contains the other containers on the network. If a host is not found on this server, the request is forward to the next highest dns server, as expected with dns.
+Docker 1.10 improves upon this by providing a full local dns system for your containers. Docker Engine runs a dns server, which is the first server all containers will go to for addresses, and this server contains the other containers on the network. If a host is not found on this server, the request is forward to the next highest dns server, as expected with dns. This is a huge improvement over the hosts file solution, as it plays nicely with other name resolution techniques that we'll see in Part 2.
 
-Networks are a surprisingly big topic in Docker (considering they didn't exist until 1.9), but we'll be making use of them in part 2. 
+Networks are a surprisingly big topic in Docker (considering they didn't exist until 1.9), but we'll be making use of them in Part 2. 
 
 ## Tools
 
 ### Docker Engine
 
-When most people think of Docker, Docker Engine is what they're really referring to. This is the 'docker daemon', the tool-set responsible for running containers. Because docker depends on namepsaces and cgroups (and other linux kernel features), it is always installed on a linux kernel system. This system is usually called a Docker Host.
+When most people think of Docker, Docker Engine is what they're really referring to. This is the _docker daemon_, the tool-set responsible for running containers. Because docker depends on [namespaces](http://man7.org/linux/man-pages/man7/namespaces.7.html) and [cgroups](https://en.wikipedia.org/wiki/Cgroups) (and other linux kernel features), it is always installed on a linux kernel system. This system is usually called a Docker Host.
 
-Technically you don't interact with the daemon itslef; you interact with the docker binary client, who relays commands to the daemon. However, the two are typically used interchangeably.
+Technically you don't interact with the daemon itself; you interact with the docker binary client, who relays commands to the daemon. However, the two are typically used interchangeably.
 
-If you have an actual VM or box running linux, Docker Engine is all you need to get started. If you're running docker on osx or windows, you'll need a linux VM.
+If you have an actual VM or box running linux, Docker Engine is all you need to get started. If you're running docker on osx or windows, you'll need a linux VM to run Docker Engine.
 
 ### Docker Toolbox
 
-Docker toolbox include a fairly large number of tools, most of which can be used regardless of your environment. This excludes Docker Machine, which is explicitly used on non-linux environments.
+Docker toolbox include a fairly large number of tools, most of which can be used regardless of your environment.
 
 I'll only go over the ones you're likely to see often here. You can check out the whole catalogue [here](https://www.docker.com/products/docker-toolbox).
 
@@ -165,7 +165,7 @@ Docker Machine is powerful; you can simulate complex production-like multi-host 
 
 #### Docker Registry
 
-Once you've built images, you need a place to put them. For a while, Docker Hub will be that place. Docker Hub is just like Git Hub, but instead of storing projects, you're storing images. The similarities don't stop there - Images are actually made up of a series of commits, like Git Hub projects. But more on that later.
+Once you've built images, you need a place to put them. For a while, Docker Hub will be that place. Docker Hub is just like Git Hub, but instead of storing projects, you're storing images. The similarities don't stop there - images are actually made up of a series of commits, like Git Hub projects. But more on that later.
 
 Docker Registry is the server system that runs repositories like Docker Hub. It's typically used by organizations so that they can store their images privately, and without uploading them to Docker Hub (which often takes a while). You can also setup local registries for personal use, though I won't dig into this much further.
 
@@ -179,7 +179,7 @@ I've historically avoided using Docker Compose due to technical limitations. How
 
 #### Docker Swarm
 
-Docker Swarm is dockers home brewed solution to multi host deployments, orchestration, and scheduling. I'll cover these terms thoroughly in part 2, but the gist is that we need a tool to monitor the state of our containers and hosts, and 'schedule' containers to be placed on our hosts.
+Docker Swarm is dockers home brewed solution to multi host deployments, orchestration, and scheduling. I'll cover these terms thoroughly in Part 2, but the gist is that we need a tool to monitor the state of our containers and hosts, and "schedule" containers to be placed on our hosts.
 
 Docker Swarm is a double edged sword. On the one hand, it's directly supported by Docker, and thus using it is rather easy; setting up a docker deployment with swarm is fairly quick. On the other hand, Docker Swarm is not nearly as powerful as its main competitors, Mesos and Kubernetes, and is typically not considered ready for large scale production use. Of course, the cost of setting up Mesos or Kubernetes is significantly higher, hence the double edge. [This is a great article](http://radar.oreilly.com/2015/10/swarm-v-fleet-v-kubernetes-v-mesos.html) comparing the most popular Container Orchestration tools.
 
@@ -192,9 +192,9 @@ Docker is rather unbiased in how it allows you to use it, giving you significant
 * Keep containers small and cheap - this plays into the implementation details, but ideally your containers are very small, and thus easy to trash and re-create.
 * One process per container - This is a good general rule for all containers. Later on we'll see that this is not a hard and fast rule, but in general you want containers to have one main purpose, even if there are other smaller processes (eg. syslog) supporting it.
 * Trash and rebuild, not fix and restart - This is another rule that we'll find some exceptions to in the practical world, but ideally we treat containers like white boxes - if they've failed, throw it away and start some new ones.
-* Store data in volumes, not containers - [Volumes](https://docs.docker.com/engine/userguide/containers/dockervolumes/) are directories that live on the Host and are mounted into containers. They separate the data from the container itself, and allow it to persist beyond the container lifecycle, and even be shared by containers (eg. read only configuration). Almost all data you care about should be stored in volumes, including logs, configuration, user data, and interesting output. 
+* Store data in volumes, not containers - [Volumes](#Volumes), as discussed above, are directories that live on the Host and are mounted into containers. They separate the data from the container itself, and allow it to persist beyond the container lifecycle, and even be shared by containers (eg. read only configuration). Almost all data you care about should be stored in volumes, including logs, configuration, user data, and interesting output. 
 * Don't connect to containers directly - This is related to the above; you want to have access to everything you need in a container without having to connect to it directly, as this doesn't scale well and is difficult in several situations. Ideally we won't be running an ssh server on our container, and everything we'd want to see, like logs, should be exposed via volumes.
-* Open as few ports as possible - While it may seem necessary to open ports for every application you want to connect to on your container, most of the time this is not true. Connecting containers with Docker Networks allows containers to intercommunicate, and if you are exposing the right data in volumes, you should have little need to open any ports. A common exception is a debug port for your database service, but it's best to keep these to a minimum.
+* Open as few ports as possible - While it may seem necessary to open ports for every application you want to connect to on your container, most of the time this is not true. Connecting containers with Docker Networks allows containers to intercommunicate, and if you are exposing the right data in volumes, you should have little need to open any ports. A common exception is a debug port for your database service, but even this can be replaced by a debug container that is connected to the docker network.
 
 
 
@@ -210,7 +210,7 @@ As briefly touched upon above, Volumes and Volume Containers can be used to pers
 
 The best defense, aside from limiting unauthorized access to your Docker Hosts, is Volume Containers. First create your volume(s), either manually via the docker daemon, or automatically in the next step. Then create a volume container that mounts those volumes, and does nothing else. Then never touch this container again. This dangling reference to each volume will make sure that your volumes cannot be accidentally destroyed.
 
-If you do delete the last container that mounts your data, your data is still there (unless you manually told docker to delete it). List your volumes via 'docker volume ls', then use the printed name to re-mount it in a new Volume Container.
+If you do delete the last container that mounts your data, your data is still there (unless you manually told docker to delete it). List your volumes via <code>docker volume ls</code>, then use the printed name to re-mount it in a new Volume Container.
 
 To backup your data, you can use docker inspect on your docker host to find the path of a volume on the host, then back that up. Or, you can deploy a new Backup Container that mounts the volume, compresses the data on it, and backs it up however you see fit.
 
@@ -220,19 +220,19 @@ Any data not in a volume will NOT be persisted. If your Docker Host crashes, con
 
 There are two degrees of logging that you'll be interested in with docker.
 
-The first is your services logs - these are often at the debug level, and help you determine at fine detail what your services are doing or how/why they failed. They are typically too large to store long term; in traditional VM systems they are stored on the VM itself, and rotated regularly. With docker, these logs can be treated in a similar fashion, expected they should be stored in a volume created by the container running them (or to make all instances of a service log in one place, use a shared volume from a volume container). The logs will remain available even if the container dies, and can be rotated as normal.
+The first is your services logs - these are often at the debug level, and help you determine at fine detail what your services are doing or how/why they failed. They are typically too large to store long term; in traditional VM systems they are stored on the VM itself, and rotated regularly. With docker, these logs can be treated in a similar fashion, except they should be stored in a volume created by the container running them (or to make all instances of a service log in one place, use a shared volume from a volume container). The logs will remain available even if the container dies, and can be rotated as normal.
 
 The second type of log are your event logs. These are higher level logs that typically are kept for much longer. For large systems, you'll want to store these somewhere like logstash to be easily shared and queried, since events are usually independent of the underlying scaling mechanism. These logstash servers can themselves be containers on your docker network, storing their data in volumes provided by a logstash Volume Container.
 
-Either type of log may require a system like syslog running on your container. This is a common example of a reasonable exception to the 1 process per container rule.
+Either type of log may require a system like syslog running on your container. This is a common example of a reasonable exception to the one process per container rule.
 
 ## Monitoring
 
-While after the fact observation is done with event logs, real time monitoring is not a simple ordeal. In part 2, I'll show a couple ways it can be used, typically in combination with your Service Discovery or Container Orchestration/Scheduling infrastructure.
+While after the fact observation is done with event logs, real time monitoring is not a simple ordeal. In Part 2, I'll show a couple ways it can be used, typically in combination with your Service Discovery or Container Orchestration/Scheduling infrastructure.
 
-For manual inspections, the docker daemon provides several command line utilities to peer into containers. For automated solutions, you'll typically have another sub process on your containers that monitors it (a consul agent, mesos daemon, nagios daemon, sensu agent, and so on). This is the second common exception to the 1 process per container rule.
+For manual inspections, the docker daemon provides several command line utilities to peer into containers. For automated solutions, you'll typically have another sub process on your containers that monitors it (a consul agent, mesos daemon, nagios daemon, sensu agent, and so on). This is the second common exception to the one process per container rule.
 
-There are also several commercial solutions built specifically for docker, easily found by searching for 'Docker Monitoring'. However, I recommend integrating your monitoring into one of your other pieces of infrastructure, to reduce boilerplate and maintenance. Using a technology that helps you scale to do your monitoring will help ensure your monitoring is also scalable.
+There are also several commercial solutions built specifically for docker, easily found by searching for "Docker Monitoring". However, I recommend integrating your monitoring into one of your other pieces of infrastructure, to reduce boilerplate and maintenance. Using a technology that helps you scale to do your monitoring will help ensure your monitoring is also scalable.
 
 
 

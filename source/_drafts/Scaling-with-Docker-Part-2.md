@@ -399,8 +399,9 @@ This will suit most personal projects and small to medium scale deployments. But
 
 ## Problems With Current Solution
 
-* ...
-* ...
+* Maintenance - Maintaining a few hosts like this is manageable. Maintaining hundreds or thousands of them is not. The same goes for monitoring tens of thousands of containers.
+* Resource Utilization - Right now we're not using our machines to their full potential. Maybe a service doesn't need an entire host? Maybe it needs multiple hosts?
+* Localization - Because we have one service per host, it's hard to localize, at least without greatly increasing our maintenance overhead. Also, if a host is destroyed, we lose that entire service - there's no automatic recovery in the event of a fire.
 
 ## General Strategy - The DCOS
 
