@@ -15,10 +15,12 @@ tags:
   - large-scale
   - images
 author: Brandon Okert
-date: 2016-02-16 8:00:00
 thumbnailImage: thumbnail.png
-summary: Getting started with Docker, from a Scaling Perspective
+summary: 'Getting started with Docker, from a Scaling Perspective'
+date: 2016-02-16 08:00:00
 ---
+
+
 
 This is the first in a two part post about Scaling with Docker. In Part 1, we'll focus on getting started with Docker from a scaling perspective. For the most part this will be an intro to Docker, so if you're already experienced using mutli-container hosts, docker networks, volume containers, monitoring tools, and management scripts, feel free to skim this part. In Part 2, we'll use the fundamentals from Part 1 to organize scalable multi-host systems, then show where to start to take that to very large scale applications.
 
@@ -80,6 +82,10 @@ Containers have already been introduced - they are the basic building blocks of 
 
 Though they are architecturally used like a VM, their implementation is closer to a directory. [Linux Namespaces](http://man7.org/linux/man-pages/man7/namespaces.7.html) and [cgroups](https://en.wikipedia.org/wiki/Cgroups) provide the isolation and limitation to these "directories" that allow them to act like VM's.
 
+As a folder, the simplest containers are just a couple files, isolated from the rest of the system. Because Linux based operating systems are essentially just many files, a more complex container is like the root folder of a typical system. Many of these files can actually be shared from the host operating system, such as basic binaries and libraries. The cgroups and namespaces also let these files be executed in their own isolated context. Thus a container can run an ssh daemon, and be logged into, and [LXC](http://blog.scottlowe.org/2013/11/25/a-brief-introduction-to-linux-containers-with-lxc/) is responsible for making it appear as if it is a completely separate system.
+
+From a usage point of view, consider Containers to be miniature Virtual Machines. From an implementation point of view, consider them to be isolated directories and processes, together with a manger that helps with things like port forwarding.
+
 ### Images
 
 Images are like templates or blueprints for creating containers. After you've built an image using a [Dockerfile](#Dockerfiles), put that image in a [Registry](#Registry), and downloaded it, you can keep using it to create any number of containers. See the [Dockerfiles](#Dockerfiles) section for more info.
@@ -125,13 +131,15 @@ Volumes are the persistent storage solution for Docker. They are used heavily to
 
 Volumes can also enable sharing of data, in the case of configuration for example. You can mount them read only to ensure data is only mutated by an administrator.
 
-A common pattern with Volumes is to create Volume Containers. A Volume Container is just a container who's sole purpose is to mount one or more volumes. You can then instruct other containers to mount all volumes mounted by the Volume Container, thus making it easy to modify groups of volumes across several servers. In addition, Volume Containers make it harder to accidentally delete volumes, since the docker daemon won't allow you to delete a volume if at least one container is using it. Volume Containers have no mutating functionality, and thus should not need to be destroyed very often.
+Under the hood, mounting a volume is like mounting a device in vanilla linux. Just like a linux machine, and thus a container, is like a big root folder, mounting a Volume in a container is like mounting a folder from a different device into that system. You mount from a source to a destination, so if you have a volume called /syslog.config you could mount it into your container at /etc/syslog/config.d. Semantically, this is similar to the unix command <code>mount /dev/dev1/syslog.config --target /etc/syslog/confid.d</code>.
+
+A common pattern with Volumes is to create Volume Containers. A Volume Container is just a container who's sole purpose is to mount one or more volumes. You can then instruct other containers to mount all volumes mounted by the Volume Container, thus making it easy to maintain a set of volumes that is shared across many containers, such as syslog configuration. In addition, Volume Containers make it harder to accidentally delete volumes, since the docker daemon won't allow you to delete a volume if at least one container is using it. Volume Containers have no mutating functionality, and thus should not need to be destroyed very often.
 
 For example, you might mount <code>/var/data/service</code>, <code>/var/log/service</code>, and <code>/var/etc/service</code> to a Volume Container. Then you can simply tell your database container to mount any volume in your Volume Container.
 
 ### Networks
 
-If you're familiar with older iterations of Docker, you may still not be familiar with Docker Networks. Docker Networks are dockers modern solution to connecting multiple containers in a private network. Previously you had to open ports manually and connect containers, or use docker links to inject the ip address and ports of containers into others via environment variables. It was not fun to maintain, even on small scale projects.
+If you're familiar with older iterations of Docker, you may still not be familiar with Docker Networks. Docker Networks are a solution to connecting multiple containers in a private network. Previously you had to open ports manually and connect containers, or use docker links to inject the ip address and ports of containers into others via environment variables. It was not fun to maintain, even on small scale projects.
  
 With networks, this process is much easier. You create networks independent from containers, specifying a global name to refer to them. Then you just tell docker containers to join them when they're created.
 
