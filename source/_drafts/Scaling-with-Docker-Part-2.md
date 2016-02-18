@@ -15,30 +15,28 @@ tags:
   - large-scale
   - images
 author: Brandon Okert
-date: 2016-02-04 18:33:10
+date: 2016-02-18 8:00:00
 thumbnailImage: thumbnail.png
 summary: Scaling Docker with Examples
 ---
 
-This is the second in a two part blog about Scaling with Docker. In this part, we'll take what we learned in Part 1 and use it to create a scalable and resilient service with Docker. While the previous part took a more conceptual route, this part will focus more on practical applications. We'll incrementally build up a set of scripts to manage deploying our hosts, applying each concept as it's described. Then I'll show you how you can use the same techniques on multiple services, and finally give an overview of how to scale massively, to thousands of hosts.
+This is the second in a two part blog about Scaling with Docker. In this part, we'll take what we learned in Part 1 and use it to create a scalable and resilient service with Docker. While the previous part took a more conceptual route, this part will focus more on practical applications. At each stage we'll update a set of scripts to automate building and deploying, and go through a few tests to get familiar with the results. Then I'll show you how you can use the same techniques on multiple services, and finally give an overview of how to scale massively, to thousands of hosts.
 
 I've implemented an example project on [github](https://github.com/bcokert/scaling-with-docker-example). As you go through the steps here, I'll let you know when to check out different tags, if you want to follow along with the code.
 
 # Getting Ready
 
-I'll be going step by step on how to set things up on OSX and Linux in parallel (since setting up on Linux is basically a subset of the OSX requirements). If you're on Windows, the steps for OSX will be almost the same, but you'll have to translate terminal commands as necessary.
+We're going to need a few things to build our first Docker Host. We need a service to work with. We need to install Virtual Box to run our docker hosts. And we'll need Docker itself.
 
-We're going to need a few things to build our Docker host. We need a service to work with. We need to install Virtual Box to run our docker hosts. And we'll need Docker itself.
+These instructions are written assuming you're using OSX or Linux; the process for Windows is equivalent to that of OSX, though you'll have to translate a few terminal commands.
 
 ## Service
 
 <p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step1</code></p>
 
-If you've already got a service you want to test with, great! If not, I'll be using a toy service in all of my examples, so that it's easy to play with the scaling without dealing with a complex service. To use your service instead of the toy one, just replace the toy service with yours in the build-scripts and deploy-scripts - I'll point out where you need to do this.
+If you've already got a service you want to test with, great! If not, I'll be using a toy service in all of my examples, so that it's easy to experiment without managing a complex service. To use your service instead of the toy one, just replace the toy service with yours in the build-scripts and deploy-scripts - I'll point out where you need to do this.
 
-You can test the toy service by going into the src folder and running <code>./start.sh.</code> Then browse to <code>localhost:8080/example1.html</code> to see if it hits our "endpoint". I've made 2 endpoints for your testing pleasure.
-
-Later when we develop the build and deploy scripts, we'll "build" it by just copying the content of <code>src/</code> to <code>build/</code>.
+You can test the toy service by going into the src folder and running <code>./start.sh.</code> Then browse to <code>localhost:8080/example1.html</code> to see if it hits our "endpoint". I've made 2 endpoints for your testing pleasure. Later when we develop the build and deploy scripts, we'll "build" it by copying the content of <code>src/</code> to <code>build/</code>.
 
 ## Virtual Box
 
@@ -48,7 +46,7 @@ We'll be using Docker Machine to actually create and manage our VM's, so once yo
 
 ## Docker and Docker Toolbox
 
-On linux, you can install each package individually. On OSX and Windows, installing Toolbox will install everything else you need.
+On linux, you can install each package individually. On OSX and Windows, installing Toolbox will install everything you need.
 
 I'm going to leave the installing to the [fine documentation on the docker website](https://docs.docker.com/engine/installation/), as it's pretty comprehensive, and the instructions change from version to version.
 
@@ -64,13 +62,13 @@ Let's go back to the conversion from a VM to a Docker Host. You've seen this bef
 <p>Architecturally these hosts are nearly identical, thus we call the one on the right a Docker Host.</p>
 </div>
 
-Throughout this post, most of the work will be done with shell scripts. This is to make it maximally transferable, and easy to understand what's going on. If you're already comfortable with tools like Docker Compose, feel free to use that instead.
+Throughout this post, most of the work will be done with shell scripts. This is to make it maximally transferable, and easy to understand what's going on. If you're already comfortable with tools like Docker Compose, feel free to use those instead.
 
 We'll need a few scripts by the end:
 
 * <code>resources/dockerfiles/dockerfile-X</code> - these will be our dockerfiles, which we'll need one of per image
 * <code>resources/dev-scripts/build-X.sh</code> - these will update our docker images when the underlying application or service changes, and push the results up to the registry. We'll need one per image type.
-* <code>resources/server-scripts/deploy.sh</code> - this is a server side script, and deploys an entire host. For complex applications, you'd probably split this into a few scripts, but we'll just use 1 for brevity. This script will deploy ALL of our containers, and it's arguments will determine how we scale.
+* <code>resources/server-scripts/deploy.sh</code> - this is a server side script, and deploys an entire host. For complex applications, you'd probably split this into a few scripts, but we'll just use one for brevity. This script will deploy ALL of our containers, and it's arguments will determine how we scale.
 
 ## Creating a Dockerfile
 
@@ -119,17 +117,17 @@ export DOCKER_CERT_PATH="/Users/username/.docker/machine/machines/default"
 export DOCKER_MACHINE_NAME="default"
 ```
 
-You run <code>eval "$(docker-machine env default)"</code> in your terminal before using docker (I use an alias for different machines). If you run fish terminal (or a more esoteric one), you might need to [pass something special to the --shell option of env](https://docs.docker.com/machine/reference/env/).
+You run <code>eval "$(docker-machine env default)"</code> in your terminal before using docker. If you run fish terminal (or a more esoteric one), you might need to [pass something special to the --shell option of env](https://docs.docker.com/machine/reference/env/).
 
 ### Putting it together
 
 <p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step3</code>.</p>
 
-Instead of pushing up manually, we're going to go right to automating our build process to make this is quicker down the road.
+Instead of pushing our image up to a repository manually, we're going to go right to automating our build process to make this quicker down the road.
 
 The <code>resources/dev-scripts/build-service.sh</code> script automatically checks that we're logged in to docker hub, makes sure the right docker machine is running and available, creates our image, and pushes it up to our repository for us. If you're following along and have your own repository, use the environment variable <code>DOCKER_REPOSITORY</code> to avoid having to copy paste your repository all over the place.
 
-The key part of the build processes is building our actual project - compiling, bundling, minifying, or whatever "building" means for your project. The end result should be a set of artifacts, which we then just copy into our image.
+The key part of the build process is building our actual project - compiling, bundling, minifying, or whatever "building" means for your project. The end result should be a set of artifacts, which we then just copy into our image.
 
 ## Testing our Image
 
@@ -160,7 +158,7 @@ As you're testing, you'll probably create a lot of junk containers. You can nuke
 
 ## Finishing off our Docker Host
 
-Our simple server doesn't need a database, and each database has different requirements. However, if you've managed to set up your service to use your database, the configuration will be very similar. So to keep our focus on scaling, I'll be skipping the database for now. At the end of this tutorial, I'll go over a sample scaled application that makes full use of a database, so don't fret!
+Our simple server doesn't need a database, and each database has different requirements. However, if you've managed to set up your service to use your database, the configuration will be very similar. So to keep our focus on scaling, I'll be skipping the database for now. At the end of this post, I'll point you to a sample scaled application that makes full use of a database, so don't fret!
 
 As for the data volume, I suggest [reading this](https://docs.docker.com/engine/userguide/containers/dockervolumes/), which will teach you everything you need to know about volume containers.
 
@@ -182,9 +180,9 @@ Believe it or not, setting up the initial Docker Host will probably take longer 
 
 <p class='follow-prompt'>If you're following along with the code, please run <code>git checkout step4</code>.</p>
 
-First we need to scale our service horizontally. In non-docker speak, this just means having multiple servers available, so that if one goes down we're alright, and if we have a lot of requests, we can distribute them.
+First we need to scale our service horizontally. Outside of docker, this just means having multiple servers available, so that if one goes down we're alright, and if we have a lot of requests, we can distribute them.
 
-This is incredibly easy to do in Docker - it's one of the reasons docker is nice to deploy with.
+This is incredibly easy to do in docker:
 
 ```
 > docker run -d --name simple_1 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
@@ -193,7 +191,7 @@ This is incredibly easy to do in Docker - it's one of the reasons docker is nice
 > docker run -d --name simple_4 ${DOCKER_REPOSITORY}/simple-server /usr/local/lib/simple-service/runserver.sh 
 ```
 
-Hey look at that! We just scaled our service to 4 nodes! Of course, we don't want to have to do this manually, so let's setup our deploy script now.
+Hey look at that! We just scaled our service to 4 nodes! Of course, we don't want to have to do this manually, so let's look at how our deploy script manages this for us.
 
 The <code>resources/server-scripts/deploy.sh</code> script takes several options and arguments. It takes care of logging in, checking that our docker machine is ok, cleaning up existing containers, and generally making deployments easy.
 
@@ -263,7 +261,7 @@ So we've got horizontally scaling containers. But we don't want people to have t
 
 Haproxy was chosen here simply because it's performant, scales well, and is highly configurable.
 
-At this point, we can make a scalable service, by scaling our service containers and putting them behind reverse-proxy nodes. If we increase the number of containers and services, an important pattern shows up:
+At this point we can make a scalable service by scaling our service containers and putting them behind reverse-proxy nodes. If we increase the number of containers and services, an important pattern shows up:
 
 <div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/adding-services/' >
 <p>Let's start with a basic host.</p>
@@ -275,9 +273,9 @@ At this point, we can make a scalable service, by scaling our service containers
 <p>We can even scale our load balancers the same way!</p>
 </div>
 
-To add a load balancer, we're going to need a new dockerfile for haproxy, give it some basic configuration, then update our deploy script. You probably already have an idea of how that would look. But hold tight! There's a key weakness in the setup we've just described that we need to address!
+To add a load balancer, we're going to need a new dockerfile for haproxy, give it some basic configuration, then update our deploy script. You probably already have an idea of how that would look. But hold tight! There's a key weakness in the setup we've just described that we need to address.
 
-Whenever we add or remove containers, we need to manually update our load balancers configuration, so it knows what containers to balance. Which means we have to know how many containers we have ahead of time... which means we can't scale on demand, we need to re-deploy our entire host every time we want to add or remove containers.
+Whenever we add or remove containers, we need to manually update our load balancers' configuration, so it knows what containers to balance. Which means we have to know how many containers we have ahead of time... which means we can't scale on demand, we need to re-deploy our entire host every time we want to add or remove containers.
 
 The solution? Service Discovery:
 
@@ -288,7 +286,7 @@ The solution? Service Discovery:
 <p>If containers are lost, they disconnect from the Quorum, thus removing them from the inventory.</p>
 </div>
 
-This gives us an up-to-date inventory of all of our containers. All we have to do is consume this inventory. We can use another consul agent for that - put the agent on the load balancer container, and any time it sees the inventory change, update the load balancers config automatically.
+This gives us an up-to-date inventory of all of our containers. All we have to do is consume this inventory. We can use another consul agent for that - put the agent on the load balancer container, and any time it sees the inventory change, update the load balancers' config automatically.
 
 There's a tool built by the same people that made consul that solves this exact problem! It's called Consul Template.
 
@@ -299,7 +297,7 @@ There's a tool built by the same people that made consul that solves this exact 
 <p>Finally, it tells the haproxy service to restart, which picks up the new configuration.</p>
 </div>
 
-And with that, we're finally ready to start implementing our load balanced, discoverable and auto updating docker hosts!
+And with that, we're finally able to implement our load balanced, discoverable and auto updating docker hosts!
 
 ## Testing Load Balancing and Service Discovery
 
@@ -313,7 +311,7 @@ Open up virtualbox, find your machine, right click, and select settings. Then se
 
 ![VirutalBox Port Configuration](/img/Scaling-With-Docker-Part-2/virtualbox-ports.png)
 
-Now you can hit your load balancers by going to <code>localhost:8X8X</code> on your local machine, and go to <code>localhost:8501/</code> to check on the status of consul:
+Now you can hit your load balancers by going to <code>localhost:8X8X</code> on your local machine, or go to <code>localhost:8501/</code> to check on the status of consul:
 
 ![VirutalBox Port Configuration](/img/Scaling-With-Docker-Part-2/consul-ui.png)
 
@@ -362,15 +360,16 @@ fbf36c26f9b4b
 b116d95d7b5cd
 
 
-> curl localhost:8181/example1.html
+> curl localhost:8181
 ...
-> curl localhost:8181/example1.html
+> curl localhost:8181
 ...
-> curl localhost:8181/example1.html
+> curl localhost:8181
 ...
 
 > docker-machine ssh
 >> docker inspect simple_haproxy_1 | grep "Mounts" -A 3
+>> ... # prints the location of the volume on disk, so that we can go look at the proxy logs
 >> sudo -i
 >> cd /mnt/sda1/var/lib/docker/volumes/4bd9e9e016c20c4628b52416fededb25bc6f2028c30c5d4a034d73cbae56b44c/_data
 >> cat haproxy_0.log
@@ -378,6 +377,8 @@ b116d95d7b5cd
 2016-... http-in webservers/server_2 ...
 2016-... http-in webservers/server_3 ...
 ```
+
+From the above, you can see that the load balancer sent the first request to server_1, the second request to server_2, and the final request to server_3.
 
 You can check real time service discovery is working by destroying some containers, then checking on consul:
  
@@ -389,11 +390,11 @@ You can check real time service discovery is working by destroying some containe
 
 ![VirutalBox Port Configuration](/img/Scaling-With-Docker-Part-2/consul-ui-after-killing.png)
 
-Note that haproxy doesn't show up in the consul list because consul-template is not a typical agent - it wouldn't be that difficult to add it though.
+Note that haproxy doesn't show up in the consul list because consul-template is not a typical agent - it wouldn't be that difficult to add it using the same technique we used for our services.
 
 # Large Scale Docker
 
-Great! We've got a scalable resilient docker host! You can add a few more hosts, and thus more services, using the same techniques described here.
+Great! We've got a scalable resilient docker host! You can add a few more hosts, and thus more services, using the same techniques described here. Then you can connect them by opening ports, or by using an [overlay network](https://docs.docker.com/engine/userguide/networking/get-started-overlay/).
 
 This will suit most personal projects and small to medium scale deployments. But a few issues arise when you try to take this to very large scale.
 
@@ -403,10 +404,55 @@ This will suit most personal projects and small to medium scale deployments. But
 * Resource Utilization - Right now we're not using our machines to their full potential. Maybe a service doesn't need an entire host? Maybe it needs multiple hosts?
 * Localization - Because we have one service per host, it's hard to localize, at least without greatly increasing our maintenance overhead. Also, if a host is destroyed, we lose that entire service - there's no automatic recovery in the event of a fire.
 
-## General Strategy - The DCOS
+There are a few developing solutions to this; all of them revolve around the idea of a special set of servers that manage your containers and hosts for you. Kubernetes and Mesos seem the most popular for large scale deployments, and Docker's own Swarm is an easier to use tool more suited to medium sized deployments.
+
+Mesos and Kubernetes have two have mutually exclusive models - Mesos abstracts a set of hosts into large data centers and is very generic, whereas Kubernetes provides an opinionated management layer on top of container clusters. As a result, Kubernetes tends to be easier to use, but Mesos is more general purpose. Neither is restricted to just running Docker Containers either - both can abstract all kinds of machines. Swarm has more in common with Kubernetes than Mesos in terms of API, but it is Docker specific, and the common opinion in the scaling community is that it is not yet well suited to very large scale systems. That being said it is evolving rapidly, and it's worth experimenting with it if your application is not expected to reach very large scale in the near future - its ease of use may well outweigh its limitations for all but the largest deployments.
+
+Though Mesos and Kubernetes both have merits (every week it seems they trade first and second place), they are similar enough that I will just focus on Mesos.
 
 # Mesos
 
-## Abstraction of Docker Hosts
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/mesos-overview/' >
+<p>Mesos lets you abstract a set of hosts into a single Megacluster. It breaks all of your hosts down into resources, and manages them for you by deciding what and where to provision. Each Host in a Mesos megacluster is a Mesos Slave. This megacluster is often called a DCOS, or Data Center Operating System.</p>
+<p>The main work is done by Mesos masters - only one is managing the cluster at a time, but there are several of them kept up to date with the system, in case one of them fails. This syncronization is done in a similar manner to our Consul servers, though it is done with [Zookeeper](https://zookeeper.apache.org/doc/trunk/zookeeperOver.html).</p>
+<p>Mesos handles deploying our containers onto our hosts for us. It determines where a container will fit based on the resources available on each host, thus using our resources more efficiently. Any container can be placed on any host.</p>
+<p>We're not limited to a single megacluster either. And since each megacluster contains every type of container, localizing our servers becomes much simpler.</p>
+</div>
 
-## Scheduling Containers
+This address each of our original concerns about large scale Docker deployments. Maintenance becomes less of an issue, since all of the hosts are now the same - they can all be provisioned the same way, and the Mesos Masters will take care of managing the contents of each host. Resource utilization is one of Mesos' strongest points; the masters break each host into abstract resources like CPU and RAM, and create Docker Containers wherever they fit. This means if a container doesn't need many resources, it won't consume many. Finally, localization is largely resolved by simply adding more megaclusters. Each megacluster has the same configuration, and can run every type of container. This means we can have localized services wherever we need them. Plus, if one of our hosts dies, Mesos just puts those containers on different hosts.
+
+This convenient management of hosts takes quite an effort to configure. But once complete, the payoff is huge - some companies claim they can manage thousands of hosts and up to a hundred thousand containers on Mesos.
+
+## Orchestration and Scheduling
+
+Mesos provides Orchestration of your hosts. It orchestrates it by Scheduling processes amongst the various hosts. Orchestration and Scheduling are the common ground amongst all large scale management systems.
+
+<div class='sequenced-image' data-base='/img/Scaling-With-Docker-Part-2/mesos-scheduling/' >
+<p>Mesos manages your hosts, by abstracting them into resources like CPU and RAM. On each Host, the Mesos Slave daemon is installed, and it's job is to keep track of the available resources on a host, reporting the available resources to the masters.</p>
+<p>The slaves periodically report their available resources. These are updated as resources are consumed and released.</p>
+<p>The masters, who track all of the resources amongst all hosts, make offers to Schedulers. The offers say what resources are available across the whole system, and a Schedulers first job is to pick the resources it wants.</p>
+<p>The Scheduler then accepts a subset of the resources, and tells the master what resources it wants and why it wants them. It tells the masters to pass a job to an Executor, who will consume the resources.</p>
+<p>The masters tell the required Executors to "execute" the jobs, which in our case means creating containers.</p>
+</div>
+
+If you've ever looked up Mesos and Docker, you've probably also come across Marathon. The combination of a Scheduler and an Executor makes up a Mesos Framework. Marathon is a Framework specializing in long running processes, like containers.
+
+## Transferring our Services to Mesos
+
+Implementing a Mesos system is far beyond the scope of this post. It's no simple task - it takes a significant time investment to get it working, and there's no "standard" way to do it yet. However, it should be clear from our discussion above where each component translates to. Here's a quick overview of what needs to be done:
+
+* Instead of managing our Hosts with shell scripts, we'll be shifting that responsibility to Marathon - this might just mean moving and adjusting the scripts, depending on how you decide to implement your stack. Though it's simple to describe, this step will take a large portion of the time in setting up Mesos.
+* We'll need to install Mesos on each of our Docker hosts to convert them into Mesos Slaves.
+* Mesos Masters will have to be provisioned and configured with our Marathon setup. Then they need to be connected to the slaves.
+* You'll have to convert some of your existing solutions to Mesos. Do you want to continue running Consul for service discovery, or switch over to Mesos DNS? In either case, configuration will have to be adjusted.
+* You'll probably want to explore the other features of Mesos. Frameworks like Chronos can help you manage backups and periodic tasks, and Marathon can be used for more than just containers.
+
+# Summary
+
+We've gone over deploying a service onto a docker host, scaling that service horizontally to multiple containers, load balancing them, and adding service discovery for fluid and reliable container deployments. We've shown how this scales to several hosts, and where the limitations of this system are. And we've overviewed how the various Orchestration frameworks, particularly Mesos, help us take our deployments to very large scales.
+
+Docker and the strategies for scaling it are still in their infancy - they're constantly evolving and improving. The best way to get a handle on them is to try them yourself, and see what works for you.
+
+I hope you've found the example project helpful. If you want to see a more fleshed out service that utilizes all these techniques, feel free to checkout another project of mine - [Elophant](https://github.com/bcokert/elophant). This project is still under development, but it may answer a few questions that come up as you play with your own docker services.
+
+Happy Scaling!
