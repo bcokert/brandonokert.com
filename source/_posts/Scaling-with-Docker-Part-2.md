@@ -15,10 +15,12 @@ tags:
   - large-scale
   - images
 author: Brandon Okert
-date: 2016-02-18 8:00:00
 thumbnailImage: thumbnail.png
 summary: Scaling Docker with Examples
+date: 2016-03-7 10:00:00
 ---
+
+
 
 This is the second in a two part blog about Scaling with Docker. In this part, we'll take what we learned in Part 1 and use it to create a scalable and resilient service with Docker. While the previous part took a more conceptual route, this part will focus more on practical applications. At each stage we'll update a set of scripts to automate building and deploying, and go through a few tests to get familiar with the results. Then I'll show you how you can use the same techniques on multiple services, and finally give an overview of how to scale massively, to thousands of hosts.
 
