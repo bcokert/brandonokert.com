@@ -9,7 +9,7 @@ tags:
 author: Brandon Okert
 thumbnailImage: thumbnail.png
 summary: Patterns for Effective Json Management in Go
-date: 2016-04-18 11:00:00
+date: 2016-04-18 11:30:00
 ---
 
 
@@ -170,8 +170,8 @@ There is a minor catch, in that we can no longer use the nonzero validator on ou
 // model
 type User struct {
      Name          *string `json:"name"              validate:"nonzero,min=1"` // required, but no defaults
-     Age           *uint   `json:"age,omitempty"     validate:"o_nonzero"`     // optional
-     Address       *string `json:"address,omitempty" validate:"o_nonzero"`     // optional
+     Age           *uint   `json:"age,omitempty"     validate:"min=1"`         // optional
+     Address       *string `json:"address,omitempty" validate:"min=1"`         // optional
      FavoriteColor string  `json:"favoriteColor"`                              // required, uses defaults
 }
 
