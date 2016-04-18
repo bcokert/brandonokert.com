@@ -7,10 +7,12 @@ tags:
   - validation
   - patterns
 author: Brandon Okert
-date: 2016-04-16 18:54:11
 thumbnailImage: thumbnail.png
 summary: Patterns for Effective Json Management in Go
+date: 2016-04-18 11:00:00
 ---
+
+
 
 Managing Json in Go is not a trivial problem. There are many examples out there of how to decode a simple json document into a struct, but few that answer the questions that inevitably come up:
 - How do I provide defaults for fields?
