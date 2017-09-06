@@ -18,6 +18,9 @@ info "Ensuring build directory is ready"
 if [ ! -d "public" ]; then
   git submodule init
   git submodule update public
+  cd public
+  git checkout master
+  cd ..
 fi
 
 info "Cleaning up old site"
