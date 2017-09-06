@@ -1,0 +1,76 @@
+.sequenced-image {
+  display: block;
+  position: relative;
+  margin: auto auto 1.75em;
+  max-width: 800px; /* fits nicely on 4:3 without scrolling */
+
+  background-color: #ffffff;
+
+  border: 1px solid #ccc;
+  padding: 5px;
+  -moz-box-shadow: 1px 1px 5px #999;
+  -webkit-box-shadow: 1px 1px 5px #999;
+  box-shadow: 1px 1px 5px #999;
+}
+
+.sequenced-image .-sequenced-image-fragment {
+  width: 100%;
+  border-radius: 0 !important;
+}
+
+.sequenced-image .-divider {
+  position: relative;
+  margin-left: auto;
+  margin-right: auto;
+  width: 99%;
+  height: 2px;
+  background-color: #dddddd;
+}
+
+.sequenced-image .-control {
+  position: relative;
+  bottom: 0;
+  opacity: 0.6;
+  padding: 0 3%;
+}
+
+.sequenced-image .-control:hover {
+  position: relative;
+  bottom: 0;
+  opacity: 0.4;
+  padding: 0 3%;
+}
+
+.sequenced-image .-control.-left {
+  left: 40%;
+}
+
+.sequenced-image .-control.-right {
+  left: 43%;
+}
+
+.sequenced-image .-control.-disabled {
+  opacity: 0.2;
+}
+
+.sequenced-image p {
+  display: none;
+}
+
+.sequenced-image br {
+  display: none;
+}
+
+.sequenced-image .-textArea {
+  font-family: "Open Sans", sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+  color: #7f797f;
+  text-align: center;
+}
+
+.sequenced-image:after {
+  clear: both;
+}

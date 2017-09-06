@@ -1,0 +1,90 @@
+---
+baseURL: http://brandonokert.com/
+languageCode: en-us
+title: BrandonOkert.com
+theme: hugo-future-imperfect
+preserveTaxonomyNames: false
+paginate: 5
+disqusShortname: brandonokert
+googleAnalytics: UA-66027344-1
+taxonomies:
+  tag: tags
+permalinks:
+  post: /:year/:month/:title/
+params:
+  description: That place where I talk about tech and projects
+  navbarTitle: Brandon Okert
+  socialAppearAtTop: true
+  socialAppearAtBottom: true
+  viewMorePostLink: /
+
+  tagsByCount: true
+  loadFavicon: true
+  faviconVersion: ""
+
+  customCSS: /css/custom.css
+  customJS: /js/sequenced-image.js
+
+  intro:
+    header: Brandon Okert
+    paragraph: >-
+      Husband, Full Stack Web Developer, Gopher, Runner, Coffee Lover, Book Reader, Food Maker.
+    about: >-
+
+    pic:
+      src: http://www.gravatar.com/avatar/1796d3ceead403d9616a2093bc42ec18?s=110
+      circle: false
+      imperfect: false
+      width: ""
+      alt: My face
+
+  postAmount:
+    sidebar: 5
+
+menu:
+  main:
+    - name: Articles
+      url: /
+      identifier: fa fa-file-text-o
+      weight: 1
+    - name: Projects
+      url: /projects/
+      identifier: fa fa-code
+      weight: 2
+    - name: Tags
+      url: /tags/
+      identifier: fa fa-tags
+      weight: 3
+    - name: About
+      url: /about/
+      identifier: fa fa-question-circle-o
+      weight: 4
+social:
+  github: bcokert
+  bitbucket: ""
+  jsfiddle: ""
+  codepen: ""
+  foursquare: ""
+  dribbble: ""
+  deviantart: ""
+  behance: ""
+  flickr: ""
+  instagram: ""
+  youtube: ""
+  vimeo: ""
+  vine: ""
+  medium: ""
+  wordpress: ""
+  tumblr: ""
+  xing: ""
+  linkedin: brandon-okert-850aa632
+  slideshare: ""
+  stackoverflow: ""
+  reddit: ""
+  pinterest: ""
+  googleplus: ""
+  facebook: ""
+  facebook_admin: ""
+  twitter_domain: ""
+  twitter: BrandonOkert
+  email: ""
