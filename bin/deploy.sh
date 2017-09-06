@@ -10,6 +10,10 @@ function info {
   echo -e "\n\x1B[1m$1\x1b[0m"
 }
 
+if ! git diff-index --quiet HEAD --; then
+  error "Cannot deploy with uncommitted changes"
+fi
+
 if [ ! -e "config.yaml" ]; then
   error "Must run from root directory (where config.yaml is)"
 fi
