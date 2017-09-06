@@ -47,10 +47,10 @@ menu:
       url: /
       identifier: fa fa-file-text-o
       weight: 1
-    - name: Projects
-      url: /projects/
-      identifier: fa fa-code
-      weight: 2
+    # - name: Projects
+    #   url: /projects/
+    #   identifier: fa fa-code
+    #   weight: 2
     - name: Tags
       url: /tags/
       identifier: fa fa-tags
