@@ -6,7 +6,7 @@ date: 2017-09-06
 
 Software Developer by day, sleeping Software Developer by night.
 
-When I'm not working I'm playing board games with my lovely wife, entertaining my two energetic siberian huskies, studying physics (yes I do that for fun), or learning something new.
+When I'm not working I'm playing board games with my beautiful wife, entertaining my two energetic siberian huskies, studying physics (yes I do that for fun), or learning something new.
 
 {{< img-fit
   "3u" "about-me-profile.jpg" ""
